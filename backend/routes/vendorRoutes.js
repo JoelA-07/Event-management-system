@@ -5,8 +5,10 @@ const {
     getServicesByCategory ,
     getMyServices ,
     getAllVendorServices , 
-    deleteService } = require('../controllers/vendorController');
-const { orderSample } = require('../controllers/vendorController');
+    deleteService,
+orderSample,
+getVendorDashboardStats,
+getVendorSampleOrders } = require('../controllers/vendorController');
 
 router.post('/add', addService);
 router.get('/:category', getServicesByCategory);
@@ -15,5 +17,7 @@ router.delete('/delete/:id', deleteService);
 router.get('/all', getServicesByCategory); // Existing (by category)
 router.get('/list/all', getAllVendorServices); // New (for Organizer)
 router.post('/order-sample', orderSample);
+router.get('/stats/:vendorId', getVendorDashboardStats);
+router.get('/samples/:vendorId', getVendorSampleOrders);
 
 module.exports = router;

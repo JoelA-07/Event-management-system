@@ -1,104 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../utils/theme.dart';
+import '../../utils/constants.dart';
 import '../../widgets/dashboard_header.dart';
-import '../vendor_caterer_screen.dart'; // Screen to manage menus
-import '../my_booking_screen.dart';    // Screen to see event schedule
-import '../caterer_add_menu_screen.dart'; // Screen to add new menu items
+import '../vendor_caterer_screen.dart';
+import '../my_booking_screen.dart';
+import '../caterer_add_menu_screen.dart';
+import '../caterer_sample_orders_screen.dart'; // Import new screen
 
-class CatererDashboard extends StatelessWidget {
+class CatererDashboard extends StatefulWidget {
   const CatererDashboard({super.key});
+
+  @override
+  State<CatererDashboard> createState() => _CatererDashboardState();
+}
+
+class _CatererDashboardState extends State<CatererDashboard> {
+  Map<String, dynamic> _stats = {
+    "totalEarnings": "0",
+    "platesServed": "0",
+    "activeMenus": 0,
+    "sampleRequests": 0
+  };
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRealStats();
+  }
+
+  // FETCH REAL DATA FROM BACKEND
+  Future<void> _loadRealStats() async {
+    try {
+      const storage = FlutterSecureStorage();
+      String? vId = await storage.read(key: "userId");
+      final res = await Dio().get("${AppConstants.baseUrl}/vendors/stats/$vId");
+      setState(() {
+        _stats = res.data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading stats: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bgColor,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // 1. HEADER (Reusable with Role Title)
-            const DashboardHeader(subTitle: "CATERING & KITCHEN PANEL"),
+      body: RefreshIndicator(
+        onRefresh: _loadRealStats, // Pull to refresh data
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              const DashboardHeader(subTitle: "CATERING & KITCHEN PANEL"),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Kitchen Overview", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    _isLoading 
+                      ? const Center(child: CircularProgressIndicator()) 
+                      : _buildStatsGrid(),
 
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 2. KITCHEN STATS SECTION
-                  const Text(
-                    "Kitchen Overview",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 15),
-                  _buildStatsGrid(),
+                    const SizedBox(height: 30),
+                    const Text("Management", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    
+                    _buildActionCard(context, "Manage My Menus", "Edit prices and items", Icons.restaurant_menu, Colors.orange, 
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatererManagementScreen()))),
+                    
+                    const SizedBox(height: 15),
 
-                  const SizedBox(height: 30),
+                    _buildActionCard(context, "Sample Tasting Requests", "Manage food sample orders", Icons.shopping_bag, Colors.deepOrange, 
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatererSampleOrdersScreen()))),
 
-                  // 3. MAIN ACTIONS SECTION
-                  const Text(
-                    "Menu & Order Management",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 15),
-                  
-                  // Manage Menus Action
-                  _buildActionCard(
-                    context,
-                    "Manage My Menus",
-                    "Update plate prices and food items",
-                    Icons.restaurant_menu_outlined,
-                    Colors.orange,
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CatererManagementScreen()),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 15),
+                    const SizedBox(height: 15),
 
-                  // Sample Tasting Orders Action
-                  _buildActionCard(
-                    context,
-                    "Sample Tasting Requests",
-                    "View and manage food sample orders",
-                    Icons.shopping_bag_outlined,
-                    Colors.deepOrange,
-                    () {
-                      // Navigate to a screen that shows GET /api/vendors/order-sample results
-                    },
-                  ),
+                    _buildActionCard(context, "Event Schedule", "Bulk catering dates", Icons.calendar_month, Colors.green, 
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyBookingsScreen()))),
 
-                  const SizedBox(height: 15),
-
-                  // Event Schedule Action
-                  _buildActionCard(
-                    context,
-                    "Event Schedule",
-                    "Check dates for bulk catering orders",
-                    Icons.calendar_month_outlined,
-                    Colors.green,
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // 4. HYGIENE & QUALITY TIP
-                  _buildHygieneTip(),
-                ],
+                    const SizedBox(height: 30),
+                    _buildHygieneTip(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-      
-      // Floating Action Button to quickly add a new menu
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddCateringMenuScreen()),
-        ),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddCateringMenuScreen())),
         backgroundColor: AppTheme.primaryColor,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text("New Menu", style: TextStyle(color: Colors.white)),
@@ -106,101 +103,57 @@ class CatererDashboard extends StatelessWidget {
     );
   }
 
-  // --- STATS GRID WIDGET ---
   Widget _buildStatsGrid() {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 15,
-      mainAxisSpacing: 15,
-      childAspectRatio: 1.4,
+      crossAxisCount: 2, crossAxisSpacing: 15, mainAxisSpacing: 15, childAspectRatio: 1.4,
       children: [
-        _statItem("Total Earnings", "₹2.4L", Colors.green),
-        _statItem("Plates Served", "1.5k", Colors.orange),
-        _statItem("Active Menus", "5", Colors.blue),
-        _statItem("Sample Requests", "12", Colors.deepOrange),
+        _statItem("Total Earnings", "₹${_stats['totalEarnings']}", Colors.green),
+        _statItem("Plates Served", _stats['platesServed'].toString(), Colors.orange),
+        _statItem("Active Menus", _stats['activeMenus'].toString(), Colors.blue),
+        _statItem("Pending Samples", _stats['sampleRequests'].toString(), Colors.deepOrange),
       ],
     );
   }
 
+  // (Helper widgets _statItem, _buildActionCard, _buildHygieneTip remain the same as your previous design)
   Widget _statItem(String label, String value, Color color) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          const SizedBox(height: 5),
-          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-        ],
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 5),
+        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+      ]),
     );
   }
 
-  // --- ACTION CARD WIDGET ---
-  Widget _buildActionCard(BuildContext context, String title, String sub, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildActionCard(context, title, sub, icon, color, onTap) {
     return InkWell(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text(sub, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-          ],
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+        child: Row(children: [
+          CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(icon, color: color)),
+          const SizedBox(width: 20),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), Text(sub, style: const TextStyle(fontSize: 12, color: Colors.grey))])),
+          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+        ]),
       ),
     );
   }
 
-  // --- HYGIENE TIP WIDGET ---
   Widget _buildHygieneTip() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.orange.shade200),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.verified_user, color: Colors.orange, size: 30),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Text(
-              "Pro-Tip: Ensure your FSSAI certificate is displayed on your profile to build client trust!",
-              style: TextStyle(color: Colors.orange.shade900, fontSize: 13, fontStyle: FontStyle.italic),
-            ),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.orange.shade200)),
+      child: const Row(children: [
+        Icon(Icons.verified_user, color: Colors.orange),
+        SizedBox(width: 15),
+        Expanded(child: Text("Ensure your FSSAI certificate is displayed on your profile!", style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic))),
+      ]),
     );
   }
 }

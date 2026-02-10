@@ -1,7 +1,7 @@
 class AppConstants {
   // Use 10.0.2.2 if using Android Emulator
   // Use your Laptop's IP (e.g., 192.168.1.15) if using a real phone
-  static const String baseUrl = "http://172.31.144.7:5000/api"; 
+  static const String baseUrl = "http://172.29.31.7:5000/api"; 
   
   // Endpoints
   static const String loginUrl = "$baseUrl/auth/login";

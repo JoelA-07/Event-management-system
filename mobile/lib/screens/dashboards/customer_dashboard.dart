@@ -19,11 +19,18 @@ class CustomerDashboard extends StatefulWidget {
 class _CustomerDashboardState extends State<CustomerDashboard> {
   int _selectedIndex = 0;
 
+  // List of Event Types for the Horizontal Row
+  final List<Map<String, String>> eventTypes = [
+    {"title": "Wedding", "img": "https://images.unsplash.com/photo-1519741497674-611481863552?w=400"},
+    {"title": "Corporate", "img": "https://images.unsplash.com/photo-1505373633569-e083a731110c?w=400"},
+    {"title": "Reception", "img": "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=400"},
+    {"title": "Birthday", "img": "https://images.unsplash.com/photo-1530103043960-ef38714abb15?w=400"},
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bgColor,
-      // 1. APP BAR WITH CART BADGE
       appBar: AppBar(
         backgroundColor: AppTheme.primaryColor,
         elevation: 0,
@@ -54,7 +61,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, 
           children: [
-            // 2. PERSONALIZED HEADER (Name & Subtitle)
             const DashboardHeader(subTitle: "FIND YOUR DREAM EVENT"),
             
             Padding(
@@ -62,11 +68,19 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start, 
                 children: [
-                  // 3. SEARCH BAR
+                  // 1. EVENT TYPES HORIZONTAL ROW (Corporate, Wedding, etc.)
+                  const Text("Plan by Event Type", 
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 15),
+                  _buildEventTypeRow(),
+                  
+                  const SizedBox(height: 30),
+
+                  // 2. SEARCH BAR
                   _buildSearchBar(), 
                   const SizedBox(height: 30),
                   
-                  // 4. CATEGORIES ROW
+                  // 3. CATEGORIES (Halls, Photo, etc.)
                   const Text("Explore Services", 
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 15),
@@ -74,12 +88,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   
                   const SizedBox(height: 30),
                   
-                  // 5. PROMO BANNER
                   _buildPromoBanner(),
                   
                   const SizedBox(height: 30),
 
-                  // 6. FEATURED HALLS PREVIEW
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -92,7 +104,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                       )
                     ],
                   ),
-                  const SizedBox(height: 10),
                   _buildFeaturedHalls(),
                 ],
               ),
@@ -101,7 +112,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         ),
       ),
 
-      // 7. AI CHATBOT FLOATING BUTTON
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primaryColor,
         child: const Icon(Icons.chat_bubble, color: Colors.white),
@@ -109,7 +119,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           context, MaterialPageRoute(builder: (_) => const ChatbotScreen())),
       ),
 
-      // 8. BOTTOM NAVIGATION BAR
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         selectedItemColor: AppTheme.primaryColor,
@@ -130,39 +139,62 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     );
   }
 
-  // SEARCH BAR WIDGET
-  Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white, 
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.search, color: AppTheme.primaryColor), 
-          SizedBox(width: 10), 
-          Text("Search halls, caterers...", style: TextStyle(color: Colors.grey))
-        ]
+  // WIDGET: EVENT TYPE ROW
+  Widget _buildEventTypeRow() {
+    return SizedBox(
+      height: 120,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: eventTypes.length,
+        itemBuilder: (context, index) {
+          return GestureDetector(
+            onTap: () {
+              // NAVIGATION: Redirect to a filtered results page
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => EventResultsScreen(title: eventTypes[index]['title']!)
+              ));
+            },
+            child: Container(
+              width: 140,
+              margin: const EdgeInsets.only(right: 15),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                image: DecorationImage(
+                  image: NetworkImage(eventTypes[index]['img']!),
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.3), BlendMode.darken),
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                eventTypes[index]['title']!,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
+
+  // --- REST OF THE UI HELPER METHODS ---
+  Widget _buildSearchBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+      child: const Row(children: [Icon(Icons.search, color: AppTheme.primaryColor), SizedBox(width: 10), Text("Search halls, caterers...", style: TextStyle(color: Colors.grey))]),
+    );
+  }
   
-  // CATEGORY ROW WIDGET (Halls, Photo, Catering, Design)
   Widget _buildCategoryRow() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _catItem(Icons.fort, "Halls", () => 
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const HallListScreen()))),
-          _catItem(Icons.camera_alt, "Photo", () => 
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'photographer')))),
-          _catItem(Icons.restaurant, "Catering", () => 
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'caterer')))),
-          _catItem(Icons.edit_note, "Design", () => 
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'designer')))),
+          _catItem(Icons.fort, "Halls", () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HallListScreen()))),
+          _catItem(Icons.camera_alt, "Photo", () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'photographer')))),
+          _catItem(Icons.restaurant, "Catering", () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'caterer')))),
+          _catItem(Icons.edit_note, "Design", () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'designer')))),
         ],
       ),
     );
@@ -174,51 +206,24 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       child: Container(
         margin: const EdgeInsets.only(right: 12),
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white, 
-          borderRadius: BorderRadius.circular(12), 
-          border: Border.all(color: Colors.black12)
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: AppTheme.primaryColor), 
-            const SizedBox(width: 8), 
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600))
-          ]
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black12)),
+        child: Row(children: [Icon(icon, size: 20, color: AppTheme.primaryColor), const SizedBox(width: 8), Text(label, style: const TextStyle(fontWeight: FontWeight.w600))]),
       ),
     );
   }
 
-  // PROMO BANNER WIDGET
   Widget _buildPromoBanner() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF6A1B9A), Color(0xFF8E24AA)]),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Wedding Bundle", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                SizedBox(height: 5),
-                Text("Get 20% off when you book Hall + Catering together.", 
-                  style: TextStyle(color: Colors.white70, fontSize: 12)),
-              ],
-            ),
-          ),
-          Icon(Icons.auto_awesome, color: AppTheme.accentColor, size: 30),
-        ],
-      ),
+      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF6A1B9A), Color(0xFF8E24AA)]), borderRadius: BorderRadius.circular(20)),
+      child: const Row(children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Wedding Bundle", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), SizedBox(height: 5), Text("Get 20% off Hall + Catering.", style: TextStyle(color: Colors.white70, fontSize: 12))])),
+        Icon(Icons.auto_awesome, color: AppTheme.accentColor, size: 30),
+      ]),
     );
   }
 
-  // FEATURED HALLS HORIZONTAL LIST
   Widget _buildFeaturedHalls() {
     return SizedBox(
       height: 180,
@@ -229,31 +234,11 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           return Container(
             width: 250,
             margin: const EdgeInsets.only(right: 15),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              image: const DecorationImage(
-                image: NetworkImage("https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=400"),
-                fit: BoxFit.cover,
-              ),
-            ),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), image: const DecorationImage(image: NetworkImage("https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=400"), fit: BoxFit.cover)),
             child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [Colors.black.withOpacity(0.8), Colors.transparent],
-                ),
-              ),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withOpacity(0.8), Colors.transparent])),
               padding: const EdgeInsets.all(15),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("The Grand Royale", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text("Chennai, Tamil Nadu", style: TextStyle(color: Colors.white70, fontSize: 11)),
-                ],
-              ),
+              child: const Column(mainAxisAlignment: MainAxisAlignment.end, crossAxisAlignment: CrossAxisAlignment.start, children: [Text("The Grand Royale", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text("Chennai, TN", style: TextStyle(color: Colors.white70, fontSize: 11))]),
             ),
           );
         },

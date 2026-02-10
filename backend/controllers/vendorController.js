@@ -1,6 +1,9 @@
 const VendorService = require('../models/VendorService');
 const User = require('../models/User');
 const SampleOrder = require('../models/SampleOrder');
+const CateringMenu = require('../models/CateringMenu');
+const SampleOrder = require('../models/SampleOrder');
+const sequelize = require('../config/db');
 
 // Add a new service (For Vendors)
 exports.addService = async (req, res) => {
@@ -74,4 +77,43 @@ exports.orderSample = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Error placing sample order", error: error.message });
   }
+
+exports.getVendorDashboardStats = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    // Count real active menus
+    const menuCount = await CateringMenu.count({ where: { vendorId } });
+
+    // Count real sample requests
+    const sampleCount = await SampleOrder.count({ where: { vendorId, status: 'pending' } });
+
+    // Dummy revenue for now (logic would sum completed bookings)
+    const totalEarnings = "2.4L"; 
+
+    res.json({
+      totalEarnings,
+      platesServed: "1.5k",
+      activeMenus: menuCount,
+      sampleRequests: sampleCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Fetch Sample Orders for the specific Caterer
+exports.getVendorSampleOrders = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const orders = await SampleOrder.findAll({
+      where: { vendorId },
+      order: [['tastingDate', 'ASC']]
+    });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 };
