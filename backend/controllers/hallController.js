@@ -1,4 +1,15 @@
 const Hall = require('../models/Hall');
+const { Op } = require('sequelize');
+
+const EVENT_KEYWORDS = {
+  wedding: ['wedding', 'marriage', 'engagement'],
+  reception: ['reception'],
+  birthday: ['birthday', 'bday'],
+  surprise: ['surprise'],
+  outing: ['outing', 'outdoor', 'trip', 'picnic'],
+  funeral: ['funeral', 'memorial'],
+  corporate: ['corporate', 'conference', 'seminar', 'office'],
+};
 
 // 1. Add a new Hall
 exports.addHall = async (req, res) => {
@@ -21,9 +32,23 @@ exports.addHall = async (req, res) => {
 // 2. Get all Halls
 exports.getAllHalls = async (req, res) => {
   try {
-    const halls = await Hall.findAll();
+    const eventType = String(req.query.eventType || '').toLowerCase().trim();
+    let where = undefined;
+
+    if (eventType) {
+      const keywords = EVENT_KEYWORDS[eventType] || [eventType];
+      where = {
+        [Op.or]: keywords.flatMap((word) => [
+          { name: { [Op.like]: `%${word}%` } },
+          { description: { [Op.like]: `%${word}%` } },
+          { location: { [Op.like]: `%${word}%` } },
+        ]),
+      };
+    }
+
+    const halls = await Hall.findAll({ where, order: [['id', 'DESC']] });
     res.json(halls);
   } catch (error) {
-    res.status(500).json({ message: "Error fetching halls" });
+    res.status(500).json({ message: 'Error fetching halls', error: error.message });
   }
 };

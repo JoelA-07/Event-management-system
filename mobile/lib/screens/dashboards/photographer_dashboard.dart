@@ -1,86 +1,97 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../services/vendor_stats_service.dart';
 import '../../utils/theme.dart';
 import '../../widgets/dashboard_header.dart';
-import '../vendor_photography_screen.dart'; // Screen to manage portfolio
-import '../my_booking_screen.dart';       // Screen to see shoot dates
+import '../my_booking_screen.dart';
+import '../vendor_photography_screen.dart';
 
-class PhotographerDashboard extends StatelessWidget {
+class PhotographerDashboard extends StatefulWidget {
   const PhotographerDashboard({super.key});
+
+  @override
+  State<PhotographerDashboard> createState() => _PhotographerDashboardState();
+}
+
+class _PhotographerDashboardState extends State<PhotographerDashboard> {
+  Map<String, dynamic> _stats = {
+    "totalEarnings": 0,
+    "activeServices": 0,
+  };
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    const storage = FlutterSecureStorage();
+    final vendorId = await storage.read(key: "userId");
+    if (vendorId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    final stats = await VendorStatsService().fetchStats(vendorId);
+    if (!mounted) return;
+    setState(() {
+      _stats = stats;
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bgColor,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // 1. HEADER (Reusable with Role Title)
-            const DashboardHeader(subTitle: "PHOTOGRAPHY STUDIO PANEL"),
-
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 2. PERFORMANCE STATS SECTION
-                  const Text(
-                    "Business Overview",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 15),
-                  _buildStatsGrid(),
-
-                  const SizedBox(height: 30),
-
-                  // 3. MAIN ACTIONS SECTION
-                  const Text(
-                    "Studio Management",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 15),
-                  
-                  // Manage Portfolio Action
-                  _buildActionCard(
-                    context,
-                    "Manage Portfolio",
-                    "Upload new shoots and update prices",
-                    Icons.camera_roll_outlined,
-                    AppTheme.primaryColor,
-                    () => Navigator.push(
+      body: RefreshIndicator(
+        onRefresh: _loadStats,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              const DashboardHeader(subTitle: "PHOTOGRAPHY STUDIO PANEL"),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Business Overview", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    _isLoading ? const Center(child: CircularProgressIndicator()) : _buildStatsGrid(),
+                    const SizedBox(height: 30),
+                    const Text("Studio Management", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    _buildActionCard(
                       context,
-                      MaterialPageRoute(builder: (_) => const PhotographyManagementScreen()),
+                      "Manage Portfolio",
+                      "Upload new shoots and update prices",
+                      Icons.camera_roll_outlined,
+                      AppTheme.primaryColor,
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PhotographyManagementScreen())),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 15),
-
-                  // Shoot Schedule Action
-                  _buildActionCard(
-                    context,
-                    "Shoot Schedule",
-                    "View your upcoming event dates",
-                    Icons.calendar_month_outlined,
-                    Colors.blue,
-                    () => Navigator.push(
+                    const SizedBox(height: 15),
+                    _buildActionCard(
                       context,
-                      MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+                      "Shoot Schedule",
+                      "View your upcoming event dates",
+                      Icons.calendar_month_outlined,
+                      Colors.blue,
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyBookingsScreen())),
                     ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // 4. TIPS SECTION
-                  _buildTipCard(),
-                ],
+                    const SizedBox(height: 30),
+                    _buildTipCard(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // --- STATS GRID WIDGET ---
   Widget _buildStatsGrid() {
     return GridView.count(
       shrinkWrap: true,
@@ -90,10 +101,8 @@ class PhotographerDashboard extends StatelessWidget {
       mainAxisSpacing: 15,
       childAspectRatio: 1.4,
       children: [
-        _statItem("Total Revenue", "₹1.2L", Colors.green),
-        _statItem("Shoots Done", "24", Colors.purple),
-        _statItem("Pending", "3", Colors.orange),
-        _statItem("Reviews", "4.8 ★", Colors.blue),
+        _statItem("Total Earnings", "Rs ${_stats['totalEarnings']}", Colors.green),
+        _statItem("Active Services", _stats['activeServices'].toString(), Colors.purple),
       ],
     );
   }
@@ -103,7 +112,7 @@ class PhotographerDashboard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -116,8 +125,14 @@ class PhotographerDashboard extends StatelessWidget {
     );
   }
 
-  // --- ACTION CARD WIDGET ---
-  Widget _buildActionCard(BuildContext context, String title, String sub, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildActionCard(
+    BuildContext context,
+    String title,
+    String sub,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -125,16 +140,13 @@ class PhotographerDashboard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 28),
             ),
             const SizedBox(width: 20),
@@ -154,7 +166,6 @@ class PhotographerDashboard extends StatelessWidget {
     );
   }
 
-  // --- TIP CARD WIDGET ---
   Widget _buildTipCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -168,7 +179,7 @@ class PhotographerDashboard extends StatelessWidget {
           SizedBox(width: 15),
           Expanded(
             child: Text(
-              "Organizer Tip: High-quality thumbnails increase your booking chances by 40%!",
+              "Keep your recent albums updated to improve booking conversion.",
               style: TextStyle(color: Colors.white, fontSize: 13, fontStyle: FontStyle.italic),
             ),
           ),
@@ -177,3 +188,4 @@ class PhotographerDashboard extends StatelessWidget {
     );
   }
 }
+

@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
-import '../services/vendor_service.dart';
 import '../models/vendor_model.dart';
+import '../services/vendor_service.dart';
 import '../utils/theme.dart';
 
 class VendorListScreen extends StatelessWidget {
-  final String category; // 'photographer', 'caterer', etc.
+  final String category;
   const VendorListScreen({super.key, required this.category});
 
   @override
   Widget build(BuildContext context) {
+    final title = "${category[0].toUpperCase()}${category.substring(1)}";
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Top ${category[0].toUpperCase()}${category.substring(1)}s"),
-        backgroundColor: Colors.white,
-        foregroundColor: AppTheme.primaryColor,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: Text("$title Services")),
       body: FutureBuilder<List<VendorModel>>(
         future: VendorService().fetchServices(category),
         builder: (context, snapshot) {
@@ -28,38 +24,49 @@ class VendorListScreen extends StatelessWidget {
 
           final vendors = snapshot.data!;
           return GridView.builder(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.all(16),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 0.75,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
+              childAspectRatio: 0.72,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
             ),
             itemCount: vendors.length,
-            itemBuilder: (context, index) {
-              final vendor = vendors[index];
-              return _buildVendorCard(context, vendor);
-            },
+            itemBuilder: (context, index) => _buildVendorCard(vendors[index]),
           );
         },
       ),
     );
   }
 
-  Widget _buildVendorCard(BuildContext context, VendorModel vendor) {
+  Widget _buildVendorCard(VendorModel vendor) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10243C).withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-              child: Image.network(vendor.imageUrl, fit: BoxFit.cover, width: double.infinity),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Image.network(
+                vendor.imageUrl,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.blueGrey.shade50,
+                  child: const Center(child: Icon(Icons.broken_image_outlined)),
+                ),
+              ),
             ),
           ),
           Padding(
@@ -67,10 +74,17 @@ class VendorListScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(vendor.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 5),
-                Text("Starting at ₹${vendor.price}", 
-                    style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                Text(
+                  vendor.name,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Starting at Rs ${vendor.price.toStringAsFixed(0)}",
+                  style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700),
+                ),
               ],
             ),
           ),

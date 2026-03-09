@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/theme.dart';
+import '../../utils/event_types.dart';
 import '../../widgets/dashboard_header.dart';
 import '../../providers/sample_cart_provider.dart';
 import '../chatbot_screen.dart';
@@ -9,6 +10,7 @@ import '../profile_screen.dart';
 import '../hall_list_screen.dart';
 import '../vendor_list_screen.dart';
 import '../sample_checkout_screen.dart';
+import '../event_results_screen.dart';
 
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
@@ -18,14 +20,6 @@ class CustomerDashboard extends StatefulWidget {
 
 class _CustomerDashboardState extends State<CustomerDashboard> {
   int _selectedIndex = 0;
-
-  // List of Event Types for the Horizontal Row
-  final List<Map<String, String>> eventTypes = [
-    {"title": "Wedding", "img": "https://images.unsplash.com/photo-1519741497674-611481863552?w=400"},
-    {"title": "Corporate", "img": "https://images.unsplash.com/photo-1505373633569-e083a731110c?w=400"},
-    {"title": "Reception", "img": "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=400"},
-    {"title": "Birthday", "img": "https://images.unsplash.com/photo-1530103043960-ef38714abb15?w=400"},
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -145,13 +139,13 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       height: 120,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: eventTypes.length,
+        itemCount: EventTypes.all.length,
         itemBuilder: (context, index) {
+          final event = EventTypes.all[index];
           return GestureDetector(
             onTap: () {
-              // NAVIGATION: Redirect to a filtered results page
               Navigator.push(context, MaterialPageRoute(
-                builder: (_) => EventResultsScreen(title: eventTypes[index]['title']!)
+                builder: (_) => EventResultsScreen(eventType: event)
               ));
             },
             child: Container(
@@ -160,14 +154,14 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
                 image: DecorationImage(
-                  image: NetworkImage(eventTypes[index]['img']!),
+                  image: NetworkImage(event.imageUrl),
                   fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.3), BlendMode.darken),
+                  colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.3), BlendMode.darken),
                 ),
               ),
               alignment: Alignment.center,
               child: Text(
-                eventTypes[index]['title']!,
+                event.title,
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
@@ -181,7 +175,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)]),
       child: const Row(children: [Icon(Icons.search, color: AppTheme.primaryColor), SizedBox(width: 10), Text("Search halls, caterers...", style: TextStyle(color: Colors.grey))]),
     );
   }
@@ -216,7 +210,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF6A1B9A), Color(0xFF8E24AA)]), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF103251), Color(0xFF1F6E8C)]), borderRadius: BorderRadius.circular(20)),
       child: const Row(children: [
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Wedding Bundle", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), SizedBox(height: 5), Text("Get 20% off Hall + Catering.", style: TextStyle(color: Colors.white70, fontSize: 12))])),
         Icon(Icons.auto_awesome, color: AppTheme.accentColor, size: 30),
@@ -236,7 +230,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
             margin: const EdgeInsets.only(right: 15),
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), image: const DecorationImage(image: NetworkImage("https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=400"), fit: BoxFit.cover)),
             child: Container(
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withOpacity(0.8), Colors.transparent])),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent])),
               padding: const EdgeInsets.all(15),
               child: const Column(mainAxisAlignment: MainAxisAlignment.end, crossAxisAlignment: CrossAxisAlignment.start, children: [Text("The Grand Royale", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text("Chennai, TN", style: TextStyle(color: Colors.white70, fontSize: 11))]),
             ),

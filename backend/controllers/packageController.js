@@ -1,4 +1,15 @@
 const Package = require('../models/Package');
+const { Op } = require('sequelize');
+
+const EVENT_KEYWORDS = {
+  wedding: ['wedding', 'marriage', 'engagement'],
+  reception: ['reception'],
+  birthday: ['birthday', 'bday'],
+  surprise: ['surprise'],
+  outing: ['outing', 'outdoor', 'trip', 'picnic'],
+  funeral: ['funeral', 'memorial'],
+  corporate: ['corporate', 'conference', 'seminar', 'office'],
+};
 
 // 1. Create a new bundle (Organizer only)
 exports.addPackage = async (req, res) => {
@@ -23,10 +34,23 @@ exports.addPackage = async (req, res) => {
 // 2. Get all packages (For Customer Dashboard)
 exports.getAllPackages = async (req, res) => {
   try {
-    const packages = await Package.findAll();
+    const eventType = String(req.query.eventType || '').toLowerCase().trim();
+    let where = undefined;
+
+    if (eventType) {
+      const keywords = EVENT_KEYWORDS[eventType] || [eventType];
+      where = {
+        [Op.or]: keywords.flatMap((word) => [
+          { title: { [Op.like]: `%${word}%` } },
+          { description: { [Op.like]: `%${word}%` } },
+        ]),
+      };
+    }
+
+    const packages = await Package.findAll({ where, order: [['id', 'DESC']] });
     res.json(packages);
   } catch (error) {
-    res.status(500).json({ message: "Error fetching packages" });
+    res.status(500).json({ message: 'Error fetching packages', error: error.message });
   }
 };
 

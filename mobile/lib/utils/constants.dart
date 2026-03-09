@@ -1,7 +1,6 @@
 class AppConstants {
   // Use 10.0.2.2 if using Android Emulator
-  // Use your Laptop's IP (e.g., 192.168.1.15) if using a real phone
-  static const String baseUrl = "http://172.29.31.7:5000/api"; 
+  static const String baseUrl = "http://10.127.48.7:5000/api";
   
   // Endpoints
   static const String loginUrl = "$baseUrl/auth/login";
@@ -13,5 +12,11 @@ class AppConstants {
 
   // Booking Endpoints
   static const String createBookingUrl = "$baseUrl/bookings/create";
-  static const String bookedDatesUrl = "$baseUrl/bookings/booked-dates"; 
+  static const String bookedDatesUrl = "$baseUrl/bookings/booked-dates";
+
+  // Vendor Endpoints
+  static const String vendorsUrl = "$baseUrl/vendors";
+
+  // Package Endpoints
+  static const String allPackagesUrl = "$baseUrl/packages/all";
 }

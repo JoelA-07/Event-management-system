@@ -33,11 +33,15 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
     if (_selectedDay == null) return;
 
     final bookingProvider = context.read<BookingProvider>();
-    
-    // In a real app, you'd get the actual logged-in user ID from your AuthProvider or Storage
-    // For now, we use a placeholder '1'. 
-    // You can later use: String? userId = await _storage.read(key: "userId");
-    int customerId = 1; 
+    final userIdString = await _storage.read(key: "userId");
+    if (!mounted) return;
+    if (userIdString == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please login again to continue")),
+      );
+      return;
+    }
+    final customerId = int.parse(userIdString);
 
     String formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDay!);
 
@@ -54,7 +58,8 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
       formattedDate,
     );
 
-    if (mounted) Navigator.pop(context); // Close loading dialog
+    if (!mounted) return;
+    Navigator.pop(context); // Close loading dialog
 
     if (error == null) {
       // Success
@@ -182,7 +187,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))
                         ],
                       ),
                       child: TableCalendar(
@@ -239,7 +244,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -5))],
         ),
         child: SafeArea(
           child: ElevatedButton(
@@ -263,3 +268,4 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
     );
   }
 }
+

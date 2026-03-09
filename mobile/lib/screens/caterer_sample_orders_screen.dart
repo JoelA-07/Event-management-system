@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../utils/theme.dart';
 import '../utils/constants.dart';
 
 class CatererSampleOrdersScreen extends StatelessWidget {

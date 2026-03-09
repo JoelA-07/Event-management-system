@@ -1,23 +1,31 @@
 const express = require('express');
 const router = express.Router();
 const { 
-    addService, 
-    getServicesByCategory ,
-    getMyServices ,
-    getAllVendorServices , 
-    deleteService,
-orderSample,
-getVendorDashboardStats,
-getVendorSampleOrders } = require('../controllers/vendorController');
+  addService,
+  addMenu,
+  getServicesByCategory,
+  getMyServices,
+  getMyMenus,
+  getAllVendorServices,
+  deleteService,
+  deleteMenu,
+  orderSample,
+  getVendorDashboardStats,
+  getVendorSampleOrders,
+  getEventRecommendations,
+} = require('../controllers/vendorController');
 
 router.post('/add', addService);
-router.get('/:category', getServicesByCategory);
+router.post('/add-menu', addMenu);
+router.get('/all', getAllVendorServices);
 router.get('/my-services/:vendorId', getMyServices);
-router.delete('/delete/:id', deleteService);
-router.get('/all', getServicesByCategory); // Existing (by category)
-router.get('/list/all', getAllVendorServices); // New (for Organizer)
-router.post('/order-sample', orderSample);
+router.get('/menus/:vendorId', getMyMenus);
 router.get('/stats/:vendorId', getVendorDashboardStats);
 router.get('/samples/:vendorId', getVendorSampleOrders);
+router.get('/event/:eventType', getEventRecommendations);
+router.delete('/delete/:id', deleteService);
+router.delete('/menu/:id', deleteMenu);
+router.post('/order-sample', orderSample);
+router.get('/:category', getServicesByCategory);
 
 module.exports = router;

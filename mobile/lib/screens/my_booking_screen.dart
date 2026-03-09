@@ -8,21 +8,16 @@ class MyBookingsScreen extends StatelessWidget {
 
   Future<List<dynamic>> _loadBookings() async {
     const storage = FlutterSecureStorage();
-    String? id = await storage.read(key: "userId");
-    String? role = await storage.read(key: "role");
-    
-    return await BookingService().fetchUserBookings(int.parse(id!), role!);
+    final id = await storage.read(key: "userId");
+    final role = await storage.read(key: "role");
+    if (id == null || role == null) return [];
+    return BookingService().fetchUserBookings(int.parse(id), role);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("My Event History", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: AppTheme.primaryColor,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text("My Event History", style: TextStyle(fontWeight: FontWeight.bold))),
       body: FutureBuilder<List<dynamic>>(
         future: _loadBookings(),
         builder: (context, snapshot) {
@@ -44,35 +39,43 @@ class MyBookingsScreen extends StatelessWidget {
 
           final bookings = snapshot.data!;
           return ListView.builder(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.all(16),
             itemCount: bookings.length,
             itemBuilder: (context, index) {
               final booking = bookings[index];
-              final hall = booking['Hall']; // Accessing the joined data
+              final hall = booking['Hall'];
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                elevation: 3,
+                margin: const EdgeInsets.only(bottom: 14),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(15),
                   leading: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: AppTheme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
                     child: const Icon(Icons.celebration, color: AppTheme.primaryColor),
                   ),
-                  title: Text(hall['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  title: Text(hall['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 5),
-                      Text("Date: ${booking['bookingDate']}", style: const TextStyle(color: Colors.black87)),
-                      Text("Status: ${booking['status'].toUpperCase()}", 
-                           style: TextStyle(color: booking['status'] == 'confirmed' ? Colors.green : Colors.orange, fontWeight: FontWeight.bold)),
+                      Text("Date: ${booking['bookingDate']}"),
+                      Text(
+                        "Status: ${booking['status'].toUpperCase()}",
+                        style: TextStyle(
+                          color: booking['status'] == 'confirmed' ? Colors.green : Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
-                  trailing: Text("₹${hall['pricePerDay']}", 
-                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryColor)),
+                  trailing: Text(
+                    "Rs ${hall['pricePerDay']}",
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryColor),
+                  ),
                 ),
               );
             },

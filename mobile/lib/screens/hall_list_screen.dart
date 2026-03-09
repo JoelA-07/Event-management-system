@@ -18,8 +18,10 @@ class _HallListScreenState extends State<HallListScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch halls from backend as soon as the screen loads
-    Future.microtask(() => context.read<HallProvider>().loadHalls());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<HallProvider>().loadHalls();
+    });
   }
 
   @override
@@ -34,31 +36,21 @@ class _HallListScreenState extends State<HallListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Explore Halls", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: const Text("Explore Venues", style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
         child: Column(
           children: [
-            // Attractive Search Bar
             TextField(
               onChanged: (value) => setState(() => searchQuery = value),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: "Search by name or location...",
-                prefixIcon: const Icon(Icons.search, color: AppTheme.primaryColor),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide.none,
-                ),
+                prefixIcon: Icon(Icons.travel_explore),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Hall List Logic
             Expanded(
               child: hallProvider.isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))

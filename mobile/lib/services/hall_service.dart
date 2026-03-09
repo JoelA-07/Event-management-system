@@ -16,9 +16,12 @@ Future<Response?> addHall(dynamic data) async {
 }
 
   // Fetch all halls from the backend
-  Future<List<HallModel>> fetchHalls() async {
+  Future<List<HallModel>> fetchHalls({String? eventType}) async {
     try {
-      final response = await _dio.get(AppConstants.allHallsUrl);
+      final response = await _dio.get(
+        AppConstants.allHallsUrl,
+        queryParameters: eventType == null ? null : {"eventType": eventType},
+      );
       
       if (response.statusCode == 200) {
         List<dynamic> data = response.data;
