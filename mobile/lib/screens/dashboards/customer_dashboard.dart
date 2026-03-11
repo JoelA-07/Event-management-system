@@ -190,6 +190,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           _catItem(Icons.restaurant, "Catering", () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'caterer')))),
           _catItem(Icons.edit_note, "Design", () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'designer')))),
           _catItem(Icons.brush, "Decor", () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'decorator')))),
+          _catItem(Icons.back_hand, "Mehendi", () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorListScreen(category: 'mehendi')))),
         ],
       ),
     );

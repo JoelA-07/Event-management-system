@@ -5,6 +5,7 @@ import 'dashboards/hall_owner_dashboard.dart';
 import 'dashboards/photographer_dashboard.dart'; // New
 import 'dashboards/caterer_dashboard.dart';      // New
 import 'dashboards/designer_dashboard.dart';
+import 'dashboards/mehendi_dashboard.dart';
 
 class DashboardSelector extends StatelessWidget {
   final String role;
@@ -25,6 +26,8 @@ class DashboardSelector extends StatelessWidget {
         return const CatererDashboard(); // Specific file
       case 'designer':
         return const DesignerDashboard();
+      case 'mehendi':
+        return const MehendiDashboard();
       default:
         // Default fallback for other vendors (like card designers)
         return const Scaffold(body: Center(child: Text("Vendor Dashboard")));

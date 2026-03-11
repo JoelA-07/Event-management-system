@@ -1,6 +1,6 @@
 class AppConstants {
   // Use 10.0.2.2 if using Android Emulator
-  static const String baseUrl = "http://10.127.48.7:5000/api";
+  static const String baseUrl = "http://10.235.113.7/api";
   
   // Endpoints
   static const String loginUrl = "$baseUrl/auth/login";

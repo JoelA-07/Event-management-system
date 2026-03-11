@@ -20,7 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _selectedRole = 'customer'; 
 
   // List of roles based on your project requirements
-  final List<String> _roles = ['customer', 'organizer', 'photographer', 'caterer', 'designer', 'hall_owner'];
+  final List<String> _roles = ['customer', 'organizer', 'photographer', 'caterer', 'designer', 'mehendi', 'hall_owner'];
 
   final AuthService _authService = AuthService();
   bool _isLoading = false;
