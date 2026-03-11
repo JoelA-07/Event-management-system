@@ -4,6 +4,7 @@ import '../../widgets/dashboard_header.dart';
 import '../my_booking_screen.dart';
 import '../organizer_package_builder.dart';
 import '../hall_list_screen.dart';
+import '../organizer_decorator_dashboard.dart';
 
 class OrganizerDashboard extends StatelessWidget {
   const OrganizerDashboard({super.key});
@@ -20,6 +21,7 @@ class OrganizerDashboard extends StatelessWidget {
               _buildTile(context, "View Bookings", "Monitor all events", Icons.analytics, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyBookingsScreen()))),
               _buildTile(context, "Build Package", "Combo Hall + Photo + Food", Icons.auto_awesome_motion, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PackageBuilderScreen()))),
               _buildTile(context, "Manage Halls", "Add or Edit venues", Icons.business, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HallListScreen()))),
+              _buildTile(context, "Decorator Studio", "Manage decoration packages", Icons.brush, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerDecoratorDashboard()))),
             ]),
           )
         ]),

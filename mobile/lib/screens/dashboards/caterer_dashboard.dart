@@ -5,8 +5,9 @@ import '../../utils/theme.dart';
 import '../../widgets/dashboard_header.dart';
 import '../caterer_add_menu_screen.dart';
 import '../caterer_sample_orders_screen.dart';
-import '../my_booking_screen.dart';
+import '../vendor_bookings_screen.dart';
 import '../vendor_caterer_screen.dart';
+import '../caterer_services_screen.dart';
 
 class CatererDashboard extends StatefulWidget {
   const CatererDashboard({super.key});
@@ -70,8 +71,17 @@ class _CatererDashboardState extends State<CatererDashboard> {
                     const SizedBox(height: 15),
                     _buildActionCard(
                       context,
+                      "Manage Catering Services",
+                      "Packages used for bookings",
+                      Icons.room_service,
+                      Colors.indigo,
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatererServicesScreen())),
+                    ),
+                    const SizedBox(height: 15),
+                    _buildActionCard(
+                      context,
                       "Manage My Menus",
-                      "Edit prices and items",
+                      "Edit prices, items, images",
                       Icons.restaurant_menu,
                       Colors.orange,
                       () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatererManagementScreen())),
@@ -92,7 +102,7 @@ class _CatererDashboardState extends State<CatererDashboard> {
                       "Bulk catering dates",
                       Icons.calendar_month,
                       Colors.green,
-                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyBookingsScreen())),
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorBookingsScreen())),
                     ),
                     const SizedBox(height: 30),
                     _buildHygieneTip(),

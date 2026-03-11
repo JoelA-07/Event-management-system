@@ -1,9 +1,14 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/vendor_service.dart';
+import '../utils/theme.dart';
 
 class AddCateringMenuScreen extends StatefulWidget {
-  const AddCateringMenuScreen({super.key});
+  final Map<String, dynamic>? existing;
+  const AddCateringMenuScreen({super.key, this.existing});
 
   @override
   State<AddCateringMenuScreen> createState() => _AddCateringMenuScreenState();
@@ -16,6 +21,26 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
   final _samplePriceController = TextEditingController();
   bool _isSampleAvailable = true;
   bool _isSaving = false;
+  File? _selectedImage;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existing != null) {
+      _nameController.text = widget.existing!['packageName'] ?? '';
+      _itemsController.text = widget.existing!['menuItems'] ?? '';
+      _priceController.text = widget.existing!['pricePerPlate']?.toString() ?? '';
+      _samplePriceController.text = widget.existing!['samplePrice']?.toString() ?? '';
+      _isSampleAvailable = widget.existing!['isSampleAvailable'] ?? true;
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (image != null) {
+      setState(() => _selectedImage = File(image.path));
+    }
+  }
 
   Future<void> _submitMenu() async {
     const storage = FlutterSecureStorage();
@@ -39,17 +64,23 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
           ? 0
           : double.parse(_samplePriceController.text.trim());
 
-      final res = await VendorService().addMenu({
+      final data = FormData.fromMap({
         "vendorId": int.parse(vId),
         "packageName": _nameController.text.trim(),
         "menuItems": _itemsController.text.trim(),
         "pricePerPlate": double.parse(_priceController.text.trim()),
         "samplePrice": samplePrice,
         "isSampleAvailable": _isSampleAvailable,
+        if (_selectedImage != null)
+          "image": await MultipartFile.fromFile(_selectedImage!.path, filename: "menu_${DateTime.now().millisecondsSinceEpoch}.jpg"),
       });
 
+      final res = widget.existing == null
+          ? await VendorService().addMenuWithImage(data)
+          : await VendorService().updateMenuWithImage(widget.existing!['id'] as int, data);
+
       if (!mounted) return;
-      if (res?.statusCode == 201) {
+      if (res?.statusCode == 201 || res?.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Menu saved successfully"),
@@ -75,11 +106,37 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Create Catering Package")),
+      appBar: AppBar(title: Text(widget.existing == null ? "Create Catering Package" : "Edit Catering Package")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: 160,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
+                ),
+                child: _selectedImage == null
+                    ? const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate, size: 40, color: AppTheme.primaryColor),
+                          SizedBox(height: 8),
+                          Text("Upload menu image"),
+                        ],
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 20),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -119,7 +176,7 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton(
                     onPressed: _submitMenu,
-                    child: const Text("SAVE MENU"),
+                    child: Text(widget.existing == null ? "SAVE MENU" : "SAVE CHANGES"),
                   ),
           ],
         ),

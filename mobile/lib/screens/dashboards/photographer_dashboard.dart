@@ -3,8 +3,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/vendor_stats_service.dart';
 import '../../utils/theme.dart';
 import '../../widgets/dashboard_header.dart';
-import '../my_booking_screen.dart';
 import '../vendor_photography_screen.dart';
+import '../vendor_bookings_screen.dart';
 
 class PhotographerDashboard extends StatefulWidget {
   const PhotographerDashboard({super.key});
@@ -78,7 +78,7 @@ class _PhotographerDashboardState extends State<PhotographerDashboard> {
                       "View your upcoming event dates",
                       Icons.calendar_month_outlined,
                       Colors.blue,
-                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyBookingsScreen())),
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorBookingsScreen())),
                     ),
                     const SizedBox(height: 30),
                     _buildTipCard(),

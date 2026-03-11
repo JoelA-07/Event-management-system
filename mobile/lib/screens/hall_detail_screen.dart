@@ -19,6 +19,12 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   final _storage = const FlutterSecureStorage();
+  String _slotType = 'full_day';
+  String _slotLabel = 'morning';
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+  bool _loadingSlots = false;
+  List<dynamic> _bookedSlots = [];
 
   @override
   void initState() {
@@ -44,6 +50,22 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
     final customerId = int.parse(userIdString);
 
     String formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDay!);
+    String? startTime;
+    String? endTime;
+    String? slotLabel;
+
+    if (_slotType == 'hourly') {
+      if (_startTime == null || _endTime == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please select start and end time")),
+        );
+        return;
+      }
+      startTime = _formatTime(_startTime!);
+      endTime = _formatTime(_endTime!);
+    } else if (_slotType == 'half_day') {
+      slotLabel = _slotLabel;
+    }
 
     // Show loading dialog
     showDialog(
@@ -56,6 +78,10 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
       widget.hall.id,
       customerId,
       formattedDate,
+      slotType: _slotType,
+      startTime: startTime,
+      endTime: endTime,
+      slotLabel: slotLabel,
     );
 
     if (!mounted) return;
@@ -202,11 +228,12 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
                           return !bookingProvider.bookedDates.contains(dateStr);
                         },
 
-                        onDaySelected: (selectedDay, focusedDay) {
+                        onDaySelected: (selectedDay, focusedDay) async {
                           setState(() {
                             _selectedDay = selectedDay;
                             _focusedDay = focusedDay;
                           });
+                          await _loadBookedSlots();
                         },
                         
                         calendarStyle: const CalendarStyle(
@@ -219,6 +246,23 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
                     ),
 
                     const SizedBox(height: 30),
+
+                    const Text(
+                      "Choose Time Slot",
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSlotTypeSelector(),
+                    if (_slotType == 'half_day') ...[
+                      const SizedBox(height: 12),
+                      _buildHalfDaySelector(),
+                    ],
+                    if (_slotType == 'hourly') ...[
+                      const SizedBox(height: 12),
+                      _buildHourlySelector(context),
+                    ],
+                    const SizedBox(height: 12),
+                    _buildBookedSlotsHint(),
 
                     const Text(
                       "About this Hall",
@@ -265,6 +309,137 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _loadBookedSlots() async {
+    if (_selectedDay == null) return;
+    setState(() => _loadingSlots = true);
+    final date = DateFormat('yyyy-MM-dd').format(_selectedDay!);
+    final slots = await context.read<BookingProvider>().fetchBookedSlots(widget.hall.id, date);
+    if (!mounted) return;
+    setState(() {
+      _bookedSlots = slots;
+      _loadingSlots = false;
+    });
+  }
+
+  String _formatTime(TimeOfDay time) {
+    final h = time.hour.toString().padLeft(2, '0');
+    final m = time.minute.toString().padLeft(2, '0');
+    return "$h:$m:00";
+  }
+
+  Widget _buildSlotTypeSelector() {
+    return Row(
+      children: [
+        _slotChip('full_day', "Full Day"),
+        const SizedBox(width: 10),
+        _slotChip('half_day', "Half Day"),
+        const SizedBox(width: 10),
+        _slotChip('hourly', "Hourly"),
+      ],
+    );
+  }
+
+  Widget _slotChip(String value, String label) {
+    final isSelected = _slotType == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+      onSelected: (_) {
+        setState(() {
+          _slotType = value;
+          _startTime = null;
+          _endTime = null;
+        });
+      },
+    );
+  }
+
+  Widget _buildHalfDaySelector() {
+    return Row(
+      children: [
+        ChoiceChip(
+          label: const Text("Morning"),
+          selected: _slotLabel == 'morning',
+          onSelected: (_) => setState(() => _slotLabel = 'morning'),
+        ),
+        const SizedBox(width: 10),
+        ChoiceChip(
+          label: const Text("Evening"),
+          selected: _slotLabel == 'evening',
+          onSelected: (_) => setState(() => _slotLabel = 'evening'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHourlySelector(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(_startTime == null ? "Start Time" : _startTime!.format(context)),
+            leading: const Icon(Icons.schedule, color: AppTheme.primaryColor),
+            onTap: () async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              if (picked != null) {
+                setState(() => _startTime = picked);
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(_endTime == null ? "End Time" : _endTime!.format(context)),
+            leading: const Icon(Icons.schedule_outlined, color: AppTheme.primaryColor),
+            onTap: () async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              if (picked != null) {
+                setState(() => _endTime = picked);
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBookedSlotsHint() {
+    if (_selectedDay == null) {
+      return const Text("Select a date to view booked slots", style: TextStyle(color: Colors.grey));
+    }
+    if (_loadingSlots) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_bookedSlots.isEmpty) {
+      return const Text("No slots booked for this date", style: TextStyle(color: Colors.green));
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: _bookedSlots.map((slot) {
+        final type = slot['slotType']?.toString() ?? 'slot';
+        final start = slot['startTime']?.toString() ?? '';
+        final end = slot['endTime']?.toString() ?? '';
+        final label = type == 'full_day' ? 'Full Day' : "$type $start-$end";
+        return Chip(
+          label: Text(label, style: const TextStyle(fontSize: 11)),
+          backgroundColor: Colors.red.shade50,
+          labelStyle: TextStyle(color: Colors.red.shade700),
+        );
+      }).toList(),
     );
   }
 }

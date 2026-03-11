@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/vendor_model.dart';
 import '../services/vendor_service.dart';
+import '../utils/constants.dart';
 import '../utils/theme.dart';
+import 'photographer_service_form_screen.dart';
 
 class PhotographyManagementScreen extends StatefulWidget {
   const PhotographyManagementScreen({super.key});
@@ -38,71 +40,12 @@ class _PhotographyManagementScreenState extends State<PhotographyManagementScree
     });
   }
 
-  Future<void> _showAddDialog() async {
-    final nameController = TextEditingController();
-    final priceController = TextEditingController();
-    final descController = TextEditingController();
-
-    final shouldSave = await showDialog<bool>(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text("Add Photography Service"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: "Service Name"),
-                ),
-                TextField(
-                  controller: priceController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Starting Price"),
-                ),
-                TextField(
-                  controller: descController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: "Description"),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("Save")),
-          ],
-        );
-      },
+  Future<void> _openForm({VendorModel? existing}) async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => PhotographerServiceFormScreen(existing: existing)),
     );
-
-    if (shouldSave != true) return;
-
-    const storage = FlutterSecureStorage();
-    final vendorId = await storage.read(key: "userId");
-    if (vendorId == null) return;
-
-    final res = await _service.addService({
-      "vendorId": int.parse(vendorId),
-      "name": nameController.text.trim(),
-      "category": "photographer",
-      "price": double.tryParse(priceController.text.trim()) ?? 0,
-      "description": descController.text.trim(),
-      "imageUrl": "https://images.unsplash.com/photo-1537633552985-df8429e8048b?w=600",
-    });
-
-    if (!mounted) return;
-    if (res?.statusCode == 201) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Service added"), backgroundColor: Colors.green),
-      );
-      _loadServices();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res?.data['message'] ?? "Failed to add service")),
-      );
-    }
+    if (saved == true) _loadServices();
   }
 
   Future<void> _deleteService(int id) async {
@@ -144,6 +87,21 @@ class _PhotographyManagementScreenState extends State<PhotographyManagementScree
                         margin: const EdgeInsets.only(bottom: 14),
                         child: ListTile(
                           contentPadding: const EdgeInsets.all(14),
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              _imageUrl(item.imageUrl),
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 56,
+                                height: 56,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.image_not_supported),
+                              ),
+                            ),
+                          ),
                           title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text(item.description),
                           trailing: Column(
@@ -156,9 +114,18 @@ class _PhotographyManagementScreenState extends State<PhotographyManagementScree
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              IconButton(
-                                onPressed: () => _deleteService(item.id),
-                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    onPressed: () => _openForm(existing: item),
+                                    icon: const Icon(Icons.edit_outlined),
+                                  ),
+                                  IconButton(
+                                    onPressed: () => _deleteService(item.id),
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -168,11 +135,17 @@ class _PhotographyManagementScreenState extends State<PhotographyManagementScree
                   ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddDialog,
+        onPressed: () => _openForm(),
         backgroundColor: AppTheme.primaryColor,
         icon: const Icon(Icons.add_a_photo, color: Colors.white),
         label: const Text("Add Service", style: TextStyle(color: Colors.white)),
       ),
     );
+  }
+
+  String _imageUrl(String raw) {
+    if (raw.startsWith('http')) return raw;
+    final base = AppConstants.baseUrl.replaceAll('/api', '');
+    return "$base$raw";
   }
 }

@@ -6,13 +6,14 @@ const VendorService = sequelize.define('VendorService', {
   vendorId: { type: DataTypes.INTEGER, allowNull: false }, // Links to User (Role: Photographer/Caterer)
   name: { type: DataTypes.STRING, allowNull: false },
   category: { 
-    type: DataTypes.ENUM('photographer', 'caterer', 'designer'), 
+    type: DataTypes.ENUM('photographer', 'caterer', 'designer', 'decorator', 'mehendi'), 
     allowNull: false 
   },
   price: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
   description: { type: DataTypes.TEXT },
   imageUrl: { type: DataTypes.STRING, defaultValue: "https://via.placeholder.com/300" },
   menuOrPortfolio: { type: DataTypes.JSON }, // Stores array of images or menu items
+  unitPrice: { type: DataTypes.DECIMAL(10, 2) }, // Optional: per-copy pricing for designers
 });
 
 module.exports = VendorService;

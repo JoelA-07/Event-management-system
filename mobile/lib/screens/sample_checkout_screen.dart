@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart'; // Add this to pubspec.yaml for date formatting
 import '../providers/sample_cart_provider.dart';
 import '../utils/theme.dart';
 import '../utils/constants.dart';
+import '../services/api_client.dart';
 
 class SampleCheckoutScreen extends StatefulWidget {
   const SampleCheckoutScreen({super.key});
@@ -58,7 +58,7 @@ class _SampleCheckoutScreenState extends State<SampleCheckoutScreen> {
       String? customerId = await storage.read(key: "userId");
 
       // 2. Prepare Data for Backend
-      final response = await Dio().post(
+      final response = await ApiClient().dio.post(
         "${AppConstants.baseUrl}/vendors/order-sample",
         data: {
           "customerId": int.parse(customerId!),

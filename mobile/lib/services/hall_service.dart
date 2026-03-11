@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 import '../utils/constants.dart';
 import '../models/hall_model.dart';
+import 'api_client.dart';
 
 class HallService {
-  final Dio _dio = Dio();
+  final Dio _dio = ApiClient().dio;
 
 
   // Inside HallService class

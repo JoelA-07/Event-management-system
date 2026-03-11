@@ -20,11 +20,27 @@ class BookingProvider with ChangeNotifier {
   }
 
   // Handle the booking action
-  Future<String?> bookHall(int hallId, int customerId, String date) async {
+  Future<String?> bookHall(
+    int hallId,
+    int customerId,
+    String date, {
+    String slotType = 'full_day',
+    String? startTime,
+    String? endTime,
+    String? slotLabel,
+  }) async {
     _isLoading = true;
     notifyListeners();
 
-    final res = await _service.createBooking(hallId, customerId, date);
+    final res = await _service.createBooking(
+      hallId,
+      customerId,
+      date,
+      slotType: slotType,
+      startTime: startTime,
+      endTime: endTime,
+      slotLabel: slotLabel,
+    );
 
     _isLoading = false;
     notifyListeners();
@@ -34,5 +50,9 @@ class BookingProvider with ChangeNotifier {
     } else {
       return res?.data['message'] ?? "Booking failed";
     }
+  }
+
+  Future<List<dynamic>> fetchBookedSlots(int hallId, String date) async {
+    return _service.getBookedSlots(hallId, date);
   }
 }

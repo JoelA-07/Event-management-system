@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
+import '../services/api_client.dart';
 
 class CatererSampleOrdersScreen extends StatelessWidget {
   const CatererSampleOrdersScreen({super.key});
@@ -9,7 +9,7 @@ class CatererSampleOrdersScreen extends StatelessWidget {
   Future<List<dynamic>> _fetchOrders() async {
     const storage = FlutterSecureStorage();
     String? vId = await storage.read(key: "userId");
-    final res = await Dio().get("${AppConstants.baseUrl}/vendors/samples/$vId");
+    final res = await ApiClient().dio.get("${AppConstants.baseUrl}/vendors/samples/$vId");
     return res.data;
   }
 

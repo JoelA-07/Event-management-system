@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 import '../utils/constants.dart';
+import 'api_client.dart';
 
 class VendorStatsService {
-  final Dio _dio = Dio();
+  final Dio _dio = ApiClient().dio;
 
   Future<Map<String, dynamic>> fetchStats(String vendorId) async {
     try {

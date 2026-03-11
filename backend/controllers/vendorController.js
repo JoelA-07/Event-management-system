@@ -29,6 +29,10 @@ function buildEventSearchWhere(eventType) {
 
 exports.addService = async (req, res) => {
   try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(req.body.vendorId)) {
+      return res.status(403).json({ message: 'Cannot add service for another vendor' });
+    }
     const service = await VendorService.create(req.body);
     res.status(201).json(service);
   } catch (error) {
@@ -36,9 +40,64 @@ exports.addService = async (req, res) => {
   }
 };
 
+exports.addServiceWithImage = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(req.body.vendorId)) {
+      return res.status(403).json({ message: 'Cannot add service for another vendor' });
+    }
+
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl;
+    const payload = { ...req.body, imageUrl };
+    const service = await VendorService.create(payload);
+    res.status(201).json(service);
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding service', error: error.message });
+  }
+};
+
+exports.updateService = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const { id } = req.params;
+    const service = await VendorService.findByPk(id);
+    if (!service) return res.status(404).json({ message: 'Service not found' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(service.vendorId)) {
+      return res.status(403).json({ message: 'Cannot update another vendor service' });
+    }
+
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl;
+    await service.update({
+      ...req.body,
+      imageUrl: imageUrl ?? service.imageUrl,
+    });
+    res.json({ message: 'Service updated', service });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating service', error: error.message });
+  }
+};
+
 exports.addMenu = async (req, res) => {
   try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(req.body.vendorId)) {
+      return res.status(403).json({ message: 'Cannot add menu for another vendor' });
+    }
     const menu = await CateringMenu.create(req.body);
+    res.status(201).json(menu);
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding menu', error: error.message });
+  }
+};
+
+exports.addMenuWithImage = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(req.body.vendorId)) {
+      return res.status(403).json({ message: 'Cannot add menu for another vendor' });
+    }
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl;
+    const menu = await CateringMenu.create({ ...req.body, imageUrl });
     res.status(201).json(menu);
   } catch (error) {
     res.status(500).json({ message: 'Error adding menu', error: error.message });
@@ -70,6 +129,10 @@ exports.getServicesByCategory = async (req, res) => {
 exports.getMyServices = async (req, res) => {
   try {
     const { vendorId } = req.params;
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(vendorId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
     const services = await VendorService.findAll({
       where: { vendorId },
       order: [['id', 'DESC']],
@@ -81,6 +144,23 @@ exports.getMyServices = async (req, res) => {
 };
 
 exports.getMyMenus = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(vendorId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    const menus = await CateringMenu.findAll({
+      where: { vendorId },
+      order: [['id', 'DESC']],
+    });
+    res.json(menus);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching menus', error: error.message });
+  }
+};
+
+exports.getMenusPublic = async (req, res) => {
   try {
     const { vendorId } = req.params;
     const menus = await CateringMenu.findAll({
@@ -95,6 +175,7 @@ exports.getMyMenus = async (req, res) => {
 
 exports.deleteService = async (req, res) => {
   try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
     await VendorService.destroy({ where: { id: req.params.id } });
     res.json({ message: 'Service removed successfully' });
   } catch (error) {
@@ -104,10 +185,31 @@ exports.deleteService = async (req, res) => {
 
 exports.deleteMenu = async (req, res) => {
   try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
     await CateringMenu.destroy({ where: { id: req.params.id } });
     res.json({ message: 'Menu removed successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting menu', error: error.message });
+  }
+};
+
+exports.updateMenu = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const { id } = req.params;
+    const menu = await CateringMenu.findByPk(id);
+    if (!menu) return res.status(404).json({ message: 'Menu not found' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(menu.vendorId)) {
+      return res.status(403).json({ message: 'Cannot update menu for another vendor' });
+    }
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl;
+    await menu.update({
+      ...req.body,
+      imageUrl: imageUrl ?? menu.imageUrl,
+    });
+    res.json({ message: 'Menu updated', menu });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating menu', error: error.message });
   }
 };
 
@@ -116,6 +218,10 @@ exports.orderSample = async (req, res) => {
     const { customerId, items, deliveryAddress, tastingDate } = req.body;
     if (!customerId || !Array.isArray(items) || items.length === 0 || !deliveryAddress || !tastingDate) {
       return res.status(400).json({ message: 'Missing required sample order fields' });
+    }
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(customerId)) {
+      return res.status(403).json({ message: 'Cannot place orders for another user' });
     }
 
     const orders = await Promise.all(
@@ -139,6 +245,10 @@ exports.orderSample = async (req, res) => {
 exports.getVendorDashboardStats = async (req, res) => {
   try {
     const { vendorId } = req.params;
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(vendorId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
     const vendor = await User.findByPk(vendorId, { attributes: ['id', 'role'] });
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor not found' });
@@ -179,6 +289,10 @@ exports.getVendorDashboardStats = async (req, res) => {
 exports.getVendorSampleOrders = async (req, res) => {
   try {
     const { vendorId } = req.params;
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(vendorId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
     const orders = await SampleOrder.findAll({
       where: { vendorId },
       order: [['tastingDate', 'ASC']],

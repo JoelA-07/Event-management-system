@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 import '../utils/constants.dart';
 import '../models/vendor_model.dart';
+import 'api_client.dart';
 
 class VendorService {
-  final Dio _dio = Dio();
+  final Dio _dio = ApiClient().dio;
 
   Future<List<VendorModel>> fetchServices(String category) async {
     try {
@@ -52,6 +53,22 @@ class VendorService {
     }
   }
 
+  Future<Response?> addServiceWithImage(FormData data) async {
+    try {
+      return await _dio.post("${AppConstants.vendorsUrl}/add-with-image", data: data);
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
+  Future<Response?> updateServiceWithImage(int id, FormData data) async {
+    try {
+      return await _dio.put("${AppConstants.vendorsUrl}/$id", data: data);
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
   Future<Response?> deleteService(int id) async {
     try {
       return await _dio.delete("${AppConstants.vendorsUrl}/delete/$id");
@@ -72,9 +89,37 @@ class VendorService {
     }
   }
 
+  Future<List<dynamic>> fetchMenusPublic(String vendorId) async {
+    try {
+      final response = await _dio.get("${AppConstants.vendorsUrl}/menus-public/$vendorId");
+      if (response.statusCode == 200) {
+        return List<dynamic>.from(response.data);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<Response?> addMenu(Map<String, dynamic> data) async {
     try {
       return await _dio.post("${AppConstants.vendorsUrl}/add-menu", data: data);
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
+  Future<Response?> addMenuWithImage(FormData data) async {
+    try {
+      return await _dio.post("${AppConstants.vendorsUrl}/add-menu-with-image", data: data);
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
+  Future<Response?> updateMenuWithImage(int id, FormData data) async {
+    try {
+      return await _dio.put("${AppConstants.vendorsUrl}/menu/$id", data: data);
     } on DioException catch (e) {
       return e.response;
     }

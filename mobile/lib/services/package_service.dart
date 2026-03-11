@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 import '../utils/constants.dart';
+import 'api_client.dart';
 
 class PackageService {
-  final Dio _dio = Dio();
+  final Dio _dio = ApiClient().dio;
 
   // 1. Fetch EVERYTHING (Halls + Vendor Services) so Organizer can pick
   Future<Map<String, List<dynamic>>> fetchAllSelectables() async {

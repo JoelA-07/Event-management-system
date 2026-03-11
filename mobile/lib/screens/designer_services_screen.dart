@@ -1,29 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../models/vendor_model.dart';
 import '../services/vendor_service.dart';
 import '../utils/constants.dart';
 import '../utils/theme.dart';
-import 'caterer_add_menu_screen.dart';
+import 'designer_service_form_screen.dart';
 
-class CatererManagementScreen extends StatefulWidget {
-  const CatererManagementScreen({super.key});
+class DesignerServicesScreen extends StatefulWidget {
+  const DesignerServicesScreen({super.key});
 
   @override
-  State<CatererManagementScreen> createState() => _CatererManagementScreenState();
+  State<DesignerServicesScreen> createState() => _DesignerServicesScreenState();
 }
 
-class _CatererManagementScreenState extends State<CatererManagementScreen> {
+class _DesignerServicesScreenState extends State<DesignerServicesScreen> {
   final VendorService _service = VendorService();
-  List<dynamic> _menus = [];
+  List<VendorModel> _services = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMenus();
+    _loadServices();
   }
 
-  Future<void> _loadMenus() async {
+  Future<void> _loadServices() async {
     const storage = FlutterSecureStorage();
     final vendorId = await storage.read(key: "userId");
     if (vendorId == null) {
@@ -31,57 +32,66 @@ class _CatererManagementScreenState extends State<CatererManagementScreen> {
       return;
     }
 
-    final menus = await _service.fetchMyMenus(vendorId);
+    final services = await _service.fetchMyServices(vendorId);
     if (!mounted) return;
     setState(() {
-      _menus = menus;
+      _services = services.where((s) => s.category == 'designer').toList();
       _isLoading = false;
     });
   }
 
-  Future<void> _deleteMenu(int id) async {
-    final res = await _service.deleteMenu(id);
+  Future<void> _openForm({VendorModel? existing}) async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => DesignerServiceFormScreen(existing: existing)),
+    );
+    if (saved == true) _loadServices();
+  }
+
+  Future<void> _deleteService(int id) async {
+    final res = await _service.deleteService(id);
     if (!mounted) return;
     if (res?.statusCode == 200) {
+      _loadServices();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Menu deleted"), backgroundColor: Colors.green),
+        const SnackBar(content: Text("Design deleted"), backgroundColor: Colors.green),
       );
-      _loadMenus();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res?.data['message'] ?? "Failed to delete menu")),
+        SnackBar(content: Text(res?.data['message'] ?? "Failed to delete design")),
       );
     }
+  }
+
+  String _imageUrl(String raw) {
+    if (raw.startsWith('http')) return raw;
+    final base = AppConstants.baseUrl.replaceAll('/api', '');
+    return "$base$raw";
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Menu Management")),
+      appBar: AppBar(title: const Text("Invitation Designs")),
       body: RefreshIndicator(
-        onRefresh: _loadMenus,
+        onRefresh: _loadServices,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : _menus.isEmpty
-                ? ListView(
-                    children: const [
-                      SizedBox(height: 140),
-                      Center(child: Text("No active menus yet")),
-                    ],
-                  )
+            : _services.isEmpty
+                ? ListView(children: const [SizedBox(height: 120), Center(child: Text("No designs yet"))])
                 : ListView.builder(
                     padding: const EdgeInsets.all(20),
-                    itemCount: _menus.length,
+                    itemCount: _services.length,
                     itemBuilder: (context, index) {
-                      final menu = _menus[index];
+                      final item = _services[index];
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 15),
+                        margin: const EdgeInsets.only(bottom: 14),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.all(15),
+                          contentPadding: const EdgeInsets.all(14),
                           leading: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: Image.network(
-                              _imageUrl(menu['imageUrl'] ?? ''),
+                              _imageUrl(item.imageUrl),
                               width: 56,
                               height: 56,
                               fit: BoxFit.cover,
@@ -93,39 +103,28 @@ class _CatererManagementScreenState extends State<CatererManagementScreen> {
                               ),
                             ),
                           ),
-                          title: Text(
-                            menu['packageName'] ?? 'Menu Package',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(menu['menuItems'] ?? ''),
+                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(item.description),
                           trailing: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                "Rs ${menu['pricePerPlate']}",
+                                "Rs ${item.price.toStringAsFixed(0)}",
                                 style: const TextStyle(
                                   color: AppTheme.primaryColor,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    onPressed: () async {
-                                      final updated = await Navigator.push<bool>(
-                                        context,
-                                        MaterialPageRoute(builder: (_) => AddCateringMenuScreen(existing: menu)),
-                                      );
-                                      if (updated == true) _loadMenus();
-                                    },
+                                    onPressed: () => _openForm(existing: item),
                                     icon: const Icon(Icons.edit_outlined),
                                   ),
                                   IconButton(
-                                    onPressed: () => _deleteMenu(menu['id'] as int),
+                                    onPressed: () => _deleteService(item.id),
                                     icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                    tooltip: "Delete menu",
                                   ),
                                 ],
                               ),
@@ -137,23 +136,11 @@ class _CatererManagementScreenState extends State<CatererManagementScreen> {
                   ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final created = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (_) => const AddCateringMenuScreen()),
-          );
-          if (created == true) _loadMenus();
-        },
+        onPressed: () => _openForm(),
         backgroundColor: AppTheme.primaryColor,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text("Add Menu", style: TextStyle(color: Colors.white)),
+        label: const Text("Add Design", style: TextStyle(color: Colors.white)),
       ),
     );
-  }
-
-  String _imageUrl(String raw) {
-    if (raw.startsWith('http')) return raw;
-    final base = AppConstants.baseUrl.replaceAll('/api', '');
-    return "$base$raw";
   }
 }

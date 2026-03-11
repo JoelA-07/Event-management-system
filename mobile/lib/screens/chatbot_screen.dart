@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import '../utils/theme.dart';
 import '../utils/constants.dart';
+import '../services/api_client.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -26,7 +26,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _controller.clear();
 
     try {
-      final response = await Dio().post("${AppConstants.baseUrl}/ai/chat", data: {
+      final response = await ApiClient().dio.post("${AppConstants.baseUrl}/ai/chat", data: {
         "message": userMsg,
         "contextHalls": [] // You can pass your hall list here later
       });

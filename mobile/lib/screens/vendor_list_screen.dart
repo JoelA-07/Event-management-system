@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/vendor_model.dart';
 import '../services/vendor_service.dart';
 import '../utils/theme.dart';
+import 'vendor_detail_screen.dart';
 
 class VendorListScreen extends StatelessWidget {
   final String category;
@@ -32,15 +33,20 @@ class VendorListScreen extends StatelessWidget {
               mainAxisSpacing: 14,
             ),
             itemCount: vendors.length,
-            itemBuilder: (context, index) => _buildVendorCard(vendors[index]),
+            itemBuilder: (context, index) => _buildVendorCard(context, vendors[index]),
           );
         },
       ),
     );
   }
 
-  Widget _buildVendorCard(VendorModel vendor) {
-    return Container(
+  Widget _buildVendorCard(BuildContext context, VendorModel vendor) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => VendorDetailScreen(vendor: vendor)),
+      ),
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -90,6 +96,7 @@ class VendorListScreen extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
