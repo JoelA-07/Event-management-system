@@ -15,7 +15,7 @@ const uploader = multer({
 });
 
 const uploadSingle = uploader.single('image'); // 'image' is the key we will use in Flutter
-const uploadMultiple = uploader.array('images', 12); // 'images' for portfolios
+const uploadMultiple = uploader.array('images', 10); // 'images' for portfolios
 
 module.exports = {
   uploadSingle,

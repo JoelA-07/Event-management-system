@@ -47,7 +47,16 @@ class _CatererServiceFormScreenState extends State<CatererServiceFormScreen> {
   Future<void> _pickGallery() async {
     final images = await ImagePicker().pickMultiImage(imageQuality: 80);
     if (images.isNotEmpty) {
-      setState(() => _gallery.addAll(images.map((e) => File(e.path))));
+      final available = AppConstants.maxPortfolioImages - _existingPortfolio.length - _gallery.length;
+      if (available <= 0) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Portfolio limit reached")),
+        );
+        return;
+      }
+      final toAdd = images.take(available).map((e) => File(e.path)).toList();
+      setState(() => _gallery.addAll(toAdd));
     }
   }
 
@@ -157,7 +166,7 @@ class _CatererServiceFormScreenState extends State<CatererServiceFormScreen> {
                   OutlinedButton.icon(
                     onPressed: _pickGallery,
                     icon: const Icon(Icons.collections),
-                    label: Text("Add Portfolio Images (${_gallery.length})"),
+                    label: Text("Add Portfolio Images (${_existingPortfolio.length + _gallery.length}/${AppConstants.maxPortfolioImages})"),
                   ),
                 ],
               ),

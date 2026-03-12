@@ -19,4 +19,7 @@ class AppConstants {
 
   // Package Endpoints
   static const String allPackagesUrl = "$baseUrl/packages/all";
+
+  // UI Limits
+  static const int maxPortfolioImages = 10;
 }

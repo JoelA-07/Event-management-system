@@ -8,6 +8,7 @@ import '../services/vendor_booking_service.dart';
 import '../services/vendor_service.dart';
 import '../utils/constants.dart';
 import '../utils/theme.dart';
+import 'gallery_viewer_screen.dart';
 
 class VendorDetailScreen extends StatefulWidget {
   final VendorModel vendor;
@@ -233,18 +234,29 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final img = _imageUrl(widget.vendor.portfolio[index]);
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              img,
-              width: 140,
-              height: 110,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+          return GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => GalleryViewerScreen(
+                  images: widget.vendor.portfolio,
+                  initialIndex: index,
+                ),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                img,
                 width: 140,
                 height: 110,
-                color: Colors.grey[200],
-                child: const Icon(Icons.image_not_supported),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 140,
+                  height: 110,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.image_not_supported),
+                ),
               ),
             ),
           );

@@ -90,6 +90,12 @@ exports.addServiceImages = async (req, res) => {
     const files = req.files || [];
     const newUrls = files.map((file) => `/uploads/${file.filename}`);
     const existing = Array.isArray(service.menuOrPortfolio) ? service.menuOrPortfolio : [];
+    const maxPortfolio = 10;
+    if (existing.length + newUrls.length > maxPortfolio) {
+      return res.status(400).json({
+        message: `Portfolio limit is ${maxPortfolio} images`,
+      });
+    }
     const merged = [...existing, ...newUrls];
 
     await service.update({ menuOrPortfolio: merged });
