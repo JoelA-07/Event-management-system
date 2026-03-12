@@ -6,6 +6,7 @@ class VendorModel {
   final double price;
   final String description;
   final String imageUrl;
+  final List<String> portfolio;
 
   VendorModel({
     required this.id,
@@ -15,9 +16,14 @@ class VendorModel {
     required this.price,
     required this.description,
     required this.imageUrl,
+    this.portfolio = const [],
   });
 
   factory VendorModel.fromJson(Map<String, dynamic> json) {
+    final rawPortfolio = json['menuOrPortfolio'];
+    final portfolio = rawPortfolio is List
+        ? rawPortfolio.map((e) => e.toString()).toList()
+        : <String>[];
     return VendorModel(
       id: json['id'],
       vendorId: json['vendorId'],
@@ -26,6 +32,7 @@ class VendorModel {
       price: double.parse(json['price'].toString()),
       description: json['description'] ?? "",
       imageUrl: json['imageUrl'] ?? "https://via.placeholder.com/300",
+      portfolio: portfolio,
     );
   }
 }

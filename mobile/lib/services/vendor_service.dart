@@ -69,6 +69,33 @@ class VendorService {
     }
   }
 
+  Future<Response?> uploadServiceImages(int id, List<String> filePaths) async {
+    try {
+      final files = await Future.wait(
+        filePaths.map(
+          (path) => MultipartFile.fromFile(path, filename: path.split(RegExp(r'[\\\\/]')).last),
+        ),
+      );
+      final data = FormData.fromMap({
+        "images": files,
+      });
+      return await _dio.post("${AppConstants.vendorsUrl}/$id/images", data: data);
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
+  Future<Response?> deleteServiceImage(int id, String url) async {
+    try {
+      return await _dio.delete(
+        "${AppConstants.vendorsUrl}/$id/images",
+        data: {"url": url},
+      );
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
   Future<Response?> deleteService(int id) async {
     try {
       return await _dio.delete("${AppConstants.vendorsUrl}/delete/$id");

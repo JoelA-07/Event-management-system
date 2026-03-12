@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/vendor_model.dart';
 import '../services/vendor_service.dart';
+import '../utils/constants.dart';
 import '../utils/theme.dart';
 
 class PhotographerServiceFormScreen extends StatefulWidget {
@@ -21,6 +22,8 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
   final _priceController = TextEditingController();
   final _descController = TextEditingController();
   File? _selectedImage;
+  final List<File> _gallery = [];
+  final List<String> _existingPortfolio = [];
   bool _isSaving = false;
 
   @override
@@ -30,6 +33,7 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
       _nameController.text = widget.existing!.name;
       _priceController.text = widget.existing!.price.toStringAsFixed(0);
       _descController.text = widget.existing!.description;
+      _existingPortfolio.addAll(widget.existing!.portfolio);
     }
   }
 
@@ -38,6 +42,29 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
     if (image != null) {
       setState(() => _selectedImage = File(image.path));
     }
+  }
+
+  Future<void> _pickGallery() async {
+    final images = await ImagePicker().pickMultiImage(imageQuality: 80);
+    if (images.isNotEmpty) {
+      setState(() => _gallery.addAll(images.map((e) => File(e.path))));
+    }
+  }
+
+  Future<void> _removeExistingImage(String url) async {
+    final res = await VendorService().deleteServiceImage(widget.existing!.id, url);
+    if (!mounted) return;
+    if (res?.statusCode == 200) {
+      setState(() => _existingPortfolio.remove(url));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res?.data['message'] ?? "Failed to remove image")),
+      );
+    }
+  }
+
+  void _removePickedImage(int index) {
+    setState(() => _gallery.removeAt(index));
   }
 
   Future<void> _save() async {
@@ -71,6 +98,13 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
     setState(() => _isSaving = false);
 
     if (res?.statusCode == 201 || res?.statusCode == 200) {
+      final serviceId = widget.existing?.id ?? res?.data['id'];
+      if (serviceId != null && _gallery.isNotEmpty) {
+        await service.uploadServiceImages(
+          serviceId,
+          _gallery.map((f) => f.path).toList(),
+        );
+      }
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(widget.existing == null ? "Service created" : "Service updated")),
@@ -118,6 +152,24 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
                 ),
               ),
               const SizedBox(height: 20),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _pickGallery,
+                    icon: const Icon(Icons.collections),
+                    label: Text("Add Portfolio Images (${_gallery.length})"),
+                  ),
+                ],
+              ),
+              if (_existingPortfolio.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildExistingGallery(),
+              ],
+              if (_gallery.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildPickedGallery(),
+              ],
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: "Package Name"),
@@ -149,5 +201,79 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
         ),
       ),
     );
+  }
+
+  Widget _buildExistingGallery() {
+    return SizedBox(
+      height: 90,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _existingPortfolio.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final url = _absoluteUrl(_existingPortfolio[index]);
+          return Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(url, width: 110, height: 90, fit: BoxFit.cover),
+              ),
+              Positioned(
+                right: 4,
+                top: 4,
+                child: GestureDetector(
+                  onTap: () => _removeExistingImage(url),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.close, color: Colors.white, size: 14),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPickedGallery() {
+    return SizedBox(
+      height: 90,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _gallery.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final file = _gallery[index];
+          return Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(file, width: 110, height: 90, fit: BoxFit.cover),
+              ),
+              Positioned(
+                right: 4,
+                top: 4,
+                child: GestureDetector(
+                  onTap: () => _removePickedImage(index),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.close, color: Colors.white, size: 14),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _absoluteUrl(String raw) {
+    if (raw.startsWith('http')) return raw;
+    final base = AppConstants.baseUrl.replaceAll('/api', '');
+    return "$base$raw";
   }
 }

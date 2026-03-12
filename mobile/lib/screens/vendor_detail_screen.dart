@@ -132,6 +132,12 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
                   const SizedBox(height: 12),
                   Text(widget.vendor.description),
                   const SizedBox(height: 20),
+                  if (widget.vendor.portfolio.isNotEmpty) ...[
+                    const Text("Portfolio", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    _buildPortfolioGallery(),
+                    const SizedBox(height: 20),
+                  ],
                   if (widget.vendor.category == 'caterer') ...[
                     const Text("Menu Packages", style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
@@ -215,6 +221,35 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildPortfolioGallery() {
+    return SizedBox(
+      height: 110,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: widget.vendor.portfolio.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final img = _imageUrl(widget.vendor.portfolio[index]);
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              img,
+              width: 140,
+              height: 110,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 140,
+                height: 110,
+                color: Colors.grey[200],
+                child: const Icon(Icons.image_not_supported),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

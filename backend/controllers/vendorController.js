@@ -77,6 +77,61 @@ exports.updateService = async (req, res) => {
   }
 };
 
+exports.addServiceImages = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const { id } = req.params;
+    const service = await VendorService.findByPk(id);
+    if (!service) return res.status(404).json({ message: 'Service not found' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(service.vendorId)) {
+      return res.status(403).json({ message: 'Cannot update another vendor service' });
+    }
+
+    const files = req.files || [];
+    const newUrls = files.map((file) => `/uploads/${file.filename}`);
+    const existing = Array.isArray(service.menuOrPortfolio) ? service.menuOrPortfolio : [];
+    const merged = [...existing, ...newUrls];
+
+    await service.update({ menuOrPortfolio: merged });
+    res.json({ message: 'Portfolio updated', menuOrPortfolio: merged });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating portfolio', error: error.message });
+  }
+};
+
+exports.removeServiceImage = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const { id } = req.params;
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ message: 'Missing image url' });
+    }
+
+    const service = await VendorService.findByPk(id);
+    if (!service) return res.status(404).json({ message: 'Service not found' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(service.vendorId)) {
+      return res.status(403).json({ message: 'Cannot update another vendor service' });
+    }
+
+    const existing = Array.isArray(service.menuOrPortfolio) ? service.menuOrPortfolio : [];
+    const next = existing.filter((item) => item !== url);
+    await service.update({ menuOrPortfolio: next });
+
+    // Best-effort delete file from disk if it's a local upload
+    if (url.startsWith('/uploads/')) {
+      const path = require('path');
+      const fs = require('fs');
+      const absolutePath = path.join(__dirname, '..', url);
+      fs.unlink(absolutePath, () => {});
+    }
+
+    res.json({ message: 'Image removed', menuOrPortfolio: next });
+  } catch (error) {
+    res.status(500).json({ message: 'Error removing image', error: error.message });
+  }
+};
+
 exports.addMenu = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
