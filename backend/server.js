@@ -1,26 +1,39 @@
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const sequelize = require('./config/db');
-const authRoutes = require('./routes/authRoutes');
-const hallRoutes = require('./routes/hallRoutes');
-const bookingRoutes = require('./routes/bookingRoutes');
-const vendorRoutes = require('./routes/vendorRoutes');
-const packageRoutes = require('./routes/packageRoutes');
-const vendorBookingRoutes = require('./routes/vendorBookingRoutes');
-const Hall = require('./models/Hall');
-const Booking = require('./models/Booking');
-const VendorBooking = require('./models/VendorBooking');
-const VendorService = require('./models/VendorService');
+const env = require('./src/config/env');
+const sequelize = require('./src/config/db');
+const authRoutes = require('./src/routes/authRoutes');
+const hallRoutes = require('./src/routes/hallRoutes');
+const bookingRoutes = require('./src/routes/bookingRoutes');
+const vendorRoutes = require('./src/routes/vendorRoutes');
+const packageRoutes = require('./src/routes/packageRoutes');
+const vendorBookingRoutes = require('./src/routes/vendorBookingRoutes');
+const organizerRoutes = require('./src/routes/organizerRoutes');
+const reviewRoutes = require('./src/routes/reviewRoutes');
+const Hall = require('./src/models/Hall');
+const Booking = require('./src/models/Booking');
+const VendorBooking = require('./src/models/VendorBooking');
+const VendorService = require('./src/models/VendorService');
+const User = require('./src/models/User');
+const Review = require('./src/models/Review');
 const path = require('path');
-const aiRoutes = require('./routes/aiRoutes');
+const aiRoutes = require('./src/routes/aiRoutes');
 
-
-dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const allowList = [
+      /^http:\/\/localhost:\d+$/,
+      /^http:\/\/127\.0\.0\.1:\d+$/,
+    ];
+    const allowed = allowList.some((pattern) => pattern.test(origin));
+    return callback(null, allowed);
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // Routes
@@ -30,6 +43,8 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/vendor-bookings', vendorBookingRoutes);
+app.use('/api/organizer', organizerRoutes);
+app.use('/api/reviews', reviewRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/ai', aiRoutes);
 
@@ -39,13 +54,19 @@ app.get('/', (req, res) => {
 });
 
 // Sync database and start server
-const PORT = process.env.PORT || 5000;
+const PORT = env.PORT;
 
 // Define Relationships
 Hall.hasMany(Booking, { foreignKey: 'hallId' });
 Booking.belongsTo(Hall, { foreignKey: 'hallId' });
 VendorService.hasMany(VendorBooking, { foreignKey: 'serviceId' });
 VendorBooking.belongsTo(VendorService, { foreignKey: 'serviceId' });
+User.hasMany(Review, { foreignKey: 'userId' });
+Review.belongsTo(User, { foreignKey: 'userId' });
+Hall.hasMany(Review, { foreignKey: 'hallId' });
+Review.belongsTo(Hall, { foreignKey: 'hallId' });
+VendorService.hasMany(Review, { foreignKey: 'serviceId' });
+Review.belongsTo(VendorService, { foreignKey: 'serviceId' });
 
 // Ensure the 'uploads' folder exists!
 const fs = require('fs');

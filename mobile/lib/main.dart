@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'providers/auth_provider.dart';
-import 'providers/hall_provider.dart';
-import 'providers/booking_provider.dart';
-import 'providers/sample_cart_provider.dart';
-import 'screens/login_screen.dart';
-import 'utils/theme.dart';
+import 'package:mobile/features/auth/providers/auth_provider.dart';
+import 'package:mobile/features/halls/providers/hall_provider.dart';
+import 'package:mobile/features/bookings/providers/booking_provider.dart';
+import 'package:mobile/features/vendors/providers/sample_cart_provider.dart';
+import 'package:mobile/features/auth/screens/login_screen.dart';
+import 'package:mobile/core/theme.dart';
 
 void main() {
   runApp(
