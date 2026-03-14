@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile/core/theme.dart';
 import 'package:mobile/core/widgets/dashboard_header.dart';
-import 'package:mobile/features/bookings/screens/my_booking_screen.dart';
+import 'package:mobile/features/bookings/screens/vendor_bookings_screen.dart';
+import 'package:mobile/features/vendors/screens/vendor_availability_screen.dart';
 import 'package:mobile/features/vendors/screens/vendor_photography_screen.dart';
 import 'package:mobile/features/vendors/screens/vendor_caterer_screen.dart';
 
@@ -73,12 +74,25 @@ class _VendorDashboardState extends State<VendorDashboard> {
                   // 2. WORK SCHEDULE / BOOKINGS
                   _buildVendorAction(
                     context,
+                    "Manage Availability",
+                    "Block dates and time slots",
+                    Icons.lock_clock,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const VendorAvailabilityScreen()),
+                    ),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  _buildVendorAction(
+                    context,
                     "My Work Schedule",
                     "View upcoming bookings and client requirements",
                     Icons.calendar_month,
                     () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+                      MaterialPageRoute(builder: (_) => const VendorBookingsScreen()),
                     ),
                   ),
 

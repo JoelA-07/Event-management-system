@@ -7,6 +7,7 @@ import 'package:mobile/core/constants.dart';
 import 'package:mobile/core/theme.dart';
 import 'package:mobile/core/widgets/dashboard_header.dart';
 import 'package:mobile/features/vendors/screens/decorator_service_form_screen.dart';
+import 'package:mobile/features/vendors/screens/vendor_availability_screen.dart';
 
 class OrganizerDecoratorDashboard extends StatefulWidget {
   const OrganizerDecoratorDashboard({super.key});
@@ -93,6 +94,23 @@ class _OrganizerDecoratorDashboardState extends State<OrganizerDecoratorDashboar
       body: Column(
         children: [
           const DashboardHeader(subTitle: "DECORATOR STUDIO"),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const VendorAvailabilityScreen()),
+                    ),
+                    icon: const Icon(Icons.lock_clock),
+                    label: const Text("Manage Availability"),
+                  ),
+                ),
+              ],
+            ),
+          ),
           Container(
             color: Colors.white,
             child: TabBar(

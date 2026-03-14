@@ -1,10 +1,47 @@
 const VendorBooking = require('../models/VendorBooking');
 const VendorService = require('../models/VendorService');
+const VendorAvailability = require('../models/VendorAvailability');
 const { Op } = require('sequelize');
+
+const SLOT_PRESETS = {
+  morning: { start: '08:00:00', end: '14:00:00' },
+  evening: { start: '15:00:00', end: '22:00:00' },
+};
+
+function toMinutes(timeStr) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function normalizeSlot({ slotType, startTime, endTime, slotLabel }) {
+  const type = slotType || 'full_day';
+  if (type === 'full_day') {
+    return { slotType: 'full_day', startTime: '00:00:00', endTime: '23:59:59' };
+  }
+  if (type === 'half_day') {
+    const preset = SLOT_PRESETS[slotLabel] || SLOT_PRESETS.morning;
+    return { slotType: 'half_day', startTime: preset.start, endTime: preset.end };
+  }
+  if (type === 'hourly') {
+    return { slotType: 'hourly', startTime, endTime };
+  }
+  return { slotType: 'full_day', startTime: '00:00:00', endTime: '23:59:59' };
+}
+
+function hasOverlap(existing, next) {
+  if (existing.slotType === 'full_day' || next.slotType === 'full_day') return true;
+  const existingStart = toMinutes(existing.startTime);
+  const existingEnd = toMinutes(existing.endTime);
+  const nextStart = toMinutes(next.startTime);
+  const nextEnd = toMinutes(next.endTime);
+  if (existingStart == null || existingEnd == null || nextStart == null || nextEnd == null) return true;
+  return nextStart < existingEnd && nextEnd > existingStart;
+}
 
 exports.createVendorBooking = async (req, res) => {
   try {
-    const { vendorId, serviceId, customerId, bookingDate, notes } = req.body;
+    const { vendorId, serviceId, customerId, bookingDate, notes, slotType, startTime, endTime, slotLabel } = req.body;
     if (!vendorId || !serviceId || !customerId || !bookingDate) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
@@ -18,16 +55,25 @@ exports.createVendorBooking = async (req, res) => {
       return res.status(400).json({ message: 'Invalid vendor service' });
     }
 
-    const existing = await VendorBooking.findOne({
-      where: {
-        vendorId,
-        serviceId,
-        bookingDate,
-        status: { [Op.ne]: 'cancelled' },
-      },
+    const normalized = normalizeSlot({ slotType, startTime, endTime, slotLabel });
+    if (normalized.slotType === 'hourly' && (!normalized.startTime || !normalized.endTime)) {
+      return res.status(400).json({ message: 'Hourly booking requires startTime and endTime' });
+    }
+
+    const existingBookings = await VendorBooking.findAll({
+      where: { vendorId, serviceId, bookingDate, status: { [Op.ne]: 'cancelled' } },
     });
-    if (existing) {
-      return res.status(400).json({ message: 'This service is already booked for the selected date' });
+    const conflictBooking = existingBookings.find((b) => hasOverlap(b, normalized));
+    if (conflictBooking) {
+      return res.status(400).json({ message: 'This slot is already booked' });
+    }
+
+    const unavailable = await VendorAvailability.findAll({
+      where: { vendorId, serviceId, date: bookingDate },
+    });
+    const conflictAvailability = unavailable.find((b) => hasOverlap(b, normalized));
+    if (conflictAvailability) {
+      return res.status(400).json({ message: 'Vendor is unavailable for this slot' });
     }
 
     const booking = await VendorBooking.create({
@@ -36,6 +82,9 @@ exports.createVendorBooking = async (req, res) => {
       customerId,
       bookingDate,
       notes,
+      slotType: normalized.slotType,
+      startTime: normalized.startTime,
+      endTime: normalized.endTime,
     });
 
     res.status(201).json({ message: 'Vendor booking created', booking });
@@ -75,5 +124,114 @@ exports.getCustomerVendorBookings = async (req, res) => {
     res.json(bookings);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching customer bookings', error: error.message });
+  }
+};
+
+exports.getVendorBookedSlots = async (req, res) => {
+  try {
+    const { vendorId, serviceId } = req.params;
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ message: 'date query param is required' });
+    const bookings = await VendorBooking.findAll({
+      where: { vendorId, serviceId, bookingDate: date, status: { [Op.ne]: 'cancelled' } },
+      attributes: ['id', 'slotType', 'startTime', 'endTime', 'status'],
+      order: [['startTime', 'ASC']],
+    });
+    res.json(bookings);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vendor slots', error: error.message });
+  }
+};
+
+exports.getVendorUnavailableSlots = async (req, res) => {
+  try {
+    const { vendorId, serviceId } = req.params;
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ message: 'date query param is required' });
+    const slots = await VendorAvailability.findAll({
+      where: { vendorId, serviceId, date },
+      attributes: ['id', 'slotType', 'startTime', 'endTime', 'reason'],
+      order: [['startTime', 'ASC']],
+    });
+    res.json(slots);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vendor unavailable slots', error: error.message });
+  }
+};
+
+exports.addVendorUnavailableSlot = async (req, res) => {
+  try {
+    const { vendorId, serviceId } = req.params;
+    const { date, slotType, startTime, endTime, slotLabel, reason } = req.body;
+    if (!date) return res.status(400).json({ message: 'date is required' });
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(vendorId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const normalized = normalizeSlot({ slotType, startTime, endTime, slotLabel });
+    const existing = await VendorAvailability.findAll({
+      where: { vendorId, serviceId, date },
+    });
+    const conflict = existing.find((b) => hasOverlap(b, normalized));
+    if (conflict) {
+      return res.status(400).json({ message: 'Slot already blocked' });
+    }
+
+    const entry = await VendorAvailability.create({
+      vendorId,
+      serviceId,
+      date,
+      slotType: normalized.slotType,
+      startTime: normalized.startTime,
+      endTime: normalized.endTime,
+      reason,
+    });
+    res.status(201).json(entry);
+  } catch (error) {
+    res.status(500).json({ message: 'Error blocking slot', error: error.message });
+  }
+};
+
+exports.deleteVendorUnavailableSlot = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const entry = await VendorAvailability.findByPk(id);
+    if (!entry) return res.status(404).json({ message: 'Slot not found' });
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(entry.vendorId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    await VendorAvailability.destroy({ where: { id } });
+    res.json({ message: 'Slot unblocked' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error removing blocked slot', error: error.message });
+  }
+};
+
+exports.updateVendorBookingStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (!status) return res.status(400).json({ message: 'status is required' });
+
+    const allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const booking = await VendorBooking.findByPk(id);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(booking.vendorId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    booking.status = status;
+    await booking.save();
+    res.json({ message: 'Booking status updated', booking });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating booking status', error: error.message });
   }
 };

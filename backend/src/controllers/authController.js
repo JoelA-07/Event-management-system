@@ -1,7 +1,42 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
+const crypto = require('crypto');
+const { JWT_SECRET, JWT_EXPIRES_IN, JWT_ISSUER, JWT_AUDIENCE, REFRESH_TOKEN_EXPIRES_IN_DAYS } = require('../config/env');
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function getSignOptions() {
+  const signOptions = { expiresIn: JWT_EXPIRES_IN };
+  if (JWT_ISSUER) signOptions.issuer = JWT_ISSUER;
+  if (JWT_AUDIENCE) signOptions.audience = JWT_AUDIENCE;
+  return signOptions;
+}
+
+async function issueTokens(user) {
+  if (!JWT_SECRET) {
+    throw new Error('Server auth misconfiguration');
+  }
+  const accessToken = jwt.sign(
+    { id: user.id, role: user.role },
+    JWT_SECRET,
+    getSignOptions(),
+  );
+
+  const refreshToken = crypto.randomBytes(64).toString('hex');
+  const refreshTokenHash = hashToken(refreshToken);
+  const refreshTokenExpiresAt = new Date(
+    Date.now() + REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  user.refreshTokenHash = refreshTokenHash;
+  user.refreshTokenExpiresAt = refreshTokenExpiresAt;
+  await user.save();
+
+  return { accessToken, refreshToken };
+}
 
 // Register
 exports.register = async (req, res) => {
@@ -54,16 +89,58 @@ exports.login = async (req, res) => {
     }
 
     // Create JWT token
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const { accessToken, refreshToken } = await issueTokens(user);
 
     res.json({
-      token,
+      token: accessToken,
+      refreshToken,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.refresh = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ message: 'Missing refresh token' });
+    }
+
+    const refreshTokenHash = hashToken(refreshToken);
+    const user = await User.findOne({ where: { refreshTokenHash } });
+    if (!user || !user.refreshTokenExpiresAt || user.refreshTokenExpiresAt < new Date()) {
+      return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = await issueTokens(user);
+
+    res.json({
+      token: accessToken,
+      refreshToken: newRefreshToken,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ message: 'Missing refresh token' });
+    }
+
+    const refreshTokenHash = hashToken(refreshToken);
+    const user = await User.findOne({ where: { refreshTokenHash } });
+    if (user) {
+      user.refreshTokenHash = null;
+      user.refreshTokenExpiresAt = null;
+      await user.save();
+    }
+    return res.json({ message: 'Logged out' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }

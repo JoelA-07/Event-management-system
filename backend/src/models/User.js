@@ -27,6 +27,14 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     defaultValue: 'customer', // customer, organizer, photographer, caterer, etc.
   },
+  refreshTokenHash: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  refreshTokenExpiresAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 });
 
 module.exports = User;

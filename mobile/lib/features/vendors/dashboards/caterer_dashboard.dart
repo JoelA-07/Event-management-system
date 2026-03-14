@@ -6,6 +6,7 @@ import 'package:mobile/core/widgets/dashboard_header.dart';
 import 'package:mobile/features/vendors/screens/caterer_add_menu_screen.dart';
 import 'package:mobile/features/vendors/screens/caterer_sample_orders_screen.dart';
 import 'package:mobile/features/bookings/screens/vendor_bookings_screen.dart';
+import 'package:mobile/features/vendors/screens/vendor_availability_screen.dart';
 import 'package:mobile/features/vendors/screens/vendor_caterer_screen.dart';
 import 'package:mobile/features/vendors/screens/caterer_services_screen.dart';
 
@@ -94,6 +95,15 @@ class _CatererDashboardState extends State<CatererDashboard> {
                       Icons.shopping_bag,
                       Colors.deepOrange,
                       () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatererSampleOrdersScreen())),
+                    ),
+                    const SizedBox(height: 15),
+                    _buildActionCard(
+                      context,
+                      "Manage Availability",
+                      "Block dates and time slots",
+                      Icons.lock_clock,
+                      Colors.deepPurple,
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorAvailabilityScreen())),
                     ),
                     const SizedBox(height: 15),
                     _buildActionCard(

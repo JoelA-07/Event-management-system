@@ -29,6 +29,13 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
   bool _loadingReviews = false;
   int _rating = 5;
   final _reviewController = TextEditingController();
+  String _slotType = 'full_day';
+  String _slotLabel = 'morning';
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+  bool _loadingSlots = false;
+  List<dynamic> _bookedSlots = [];
+  List<dynamic> _blockedSlots = [];
 
   @override
   void initState() {
@@ -37,6 +44,24 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
       _loadMenus();
     }
     _loadReviews();
+  }
+
+  String _imageUrl(String raw) {
+    if (raw.startsWith('http')) return raw;
+    final base = AppConstants.baseUrl.replaceAll('/api', '');
+    return "$base$raw";
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now().add(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
   }
 
   Future<void> _loadMenus() async {
@@ -59,22 +84,39 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
     });
   }
 
-  String _imageUrl(String raw) {
-    if (raw.startsWith('http')) return raw;
-    final base = AppConstants.baseUrl.replaceAll('/api', '');
-    return "$base$raw";
+  double _averageRating() {
+    if (_reviews.isEmpty) return 0;
+    final sum = _reviews.fold<double>(0, (prev, r) => prev + (double.tryParse(r['rating'].toString()) ?? 0));
+    return sum / _reviews.length;
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now().add(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+  Future<void> _loadVendorSlots() async {
+    if (_selectedDate == null) return;
+    setState(() => _loadingSlots = true);
+    final date = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+    final bookingService = VendorBookingService();
+    final booked = await bookingService.fetchVendorBookedSlots(
+      vendorId: widget.vendor.vendorId,
+      serviceId: widget.vendor.id,
+      date: date,
     );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
+    final blocked = await bookingService.fetchVendorUnavailableSlots(
+      vendorId: widget.vendor.vendorId,
+      serviceId: widget.vendor.id,
+      date: date,
+    );
+    if (!mounted) return;
+    setState(() {
+      _bookedSlots = booked;
+      _blockedSlots = blocked;
+      _loadingSlots = false;
+    });
+  }
+
+  String _formatTime(TimeOfDay time) {
+    final h = time.hour.toString().padLeft(2, '0');
+    final m = time.minute.toString().padLeft(2, '0');
+    return "$h:$m:00";
   }
 
   Future<void> _bookService() async {
@@ -83,6 +125,22 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
         const SnackBar(content: Text("Please select a date")),
       );
       return;
+    }
+
+    String? startTime;
+    String? endTime;
+    String? slotLabel;
+    if (_slotType == 'hourly') {
+      if (_startTime == null || _endTime == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please select start and end time")),
+        );
+        return;
+      }
+      startTime = _formatTime(_startTime!);
+      endTime = _formatTime(_endTime!);
+    } else if (_slotType == 'half_day') {
+      slotLabel = _slotLabel;
     }
 
     setState(() => _isBooking = true);
@@ -100,6 +158,10 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
       customerId: int.parse(customerId),
       bookingDate: DateFormat('yyyy-MM-dd').format(_selectedDate!),
       notes: _notesController.text.trim(),
+      slotType: _slotType,
+      startTime: startTime,
+      endTime: endTime,
+      slotLabel: slotLabel,
     );
 
     if (!mounted) return;
@@ -115,12 +177,6 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
         SnackBar(content: Text(res?.data['message'] ?? "Booking failed")),
       );
     }
-  }
-
-  double _averageRating() {
-    if (_reviews.isEmpty) return 0;
-    final sum = _reviews.fold<double>(0, (prev, r) => prev + (double.tryParse(r['rating'].toString()) ?? 0));
-    return sum / _reviews.length;
   }
 
   @override
@@ -190,8 +246,25 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
                           : DateFormat('dd MMM yyyy').format(_selectedDate!),
                     ),
                     trailing: const Icon(Icons.edit, size: 16),
-                    onTap: _pickDate,
+                    onTap: () async {
+                      await _pickDate();
+                      if (_selectedDate != null) {
+                        _loadVendorSlots();
+                      }
+                    },
                   ),
+                  const SizedBox(height: 12),
+                  _buildSlotTypeSelector(),
+                  if (_slotType == 'half_day') ...[
+                    const SizedBox(height: 12),
+                    _buildHalfDaySelector(),
+                  ],
+                  if (_slotType == 'hourly') ...[
+                    const SizedBox(height: 12),
+                    _buildHourlySelector(context),
+                  ],
+                  const SizedBox(height: 12),
+                  _buildBookedSlotsHint(),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _notesController,
@@ -409,6 +482,132 @@ class _VendorDetailScreenState extends State<VendorDetailScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildSlotTypeSelector() {
+    return Row(
+      children: [
+        _slotChip('full_day', "Full Day"),
+        const SizedBox(width: 10),
+        _slotChip('half_day', "Half Day"),
+        const SizedBox(width: 10),
+        _slotChip('hourly', "Hourly"),
+      ],
+    );
+  }
+
+  Widget _slotChip(String value, String label) {
+    final isSelected = _slotType == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+      onSelected: (_) {
+        setState(() {
+          _slotType = value;
+          _startTime = null;
+          _endTime = null;
+        });
+      },
+    );
+  }
+
+  Widget _buildHalfDaySelector() {
+    return Row(
+      children: [
+        ChoiceChip(
+          label: const Text("Morning"),
+          selected: _slotLabel == 'morning',
+          onSelected: (_) => setState(() => _slotLabel = 'morning'),
+        ),
+        const SizedBox(width: 10),
+        ChoiceChip(
+          label: const Text("Evening"),
+          selected: _slotLabel == 'evening',
+          onSelected: (_) => setState(() => _slotLabel = 'evening'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHourlySelector(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(_startTime == null ? "Start Time" : _startTime!.format(context)),
+            leading: const Icon(Icons.schedule, color: AppTheme.primaryColor),
+            onTap: () async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              if (picked != null) {
+                setState(() => _startTime = picked);
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(_endTime == null ? "End Time" : _endTime!.format(context)),
+            leading: const Icon(Icons.schedule_outlined, color: AppTheme.primaryColor),
+            onTap: () async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              if (picked != null) {
+                setState(() => _endTime = picked);
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBookedSlotsHint() {
+    if (_selectedDate == null) {
+      return const Text("Select a date to view booked slots", style: TextStyle(color: Colors.grey));
+    }
+    if (_loadingSlots) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_bookedSlots.isEmpty && _blockedSlots.isEmpty) {
+      return const Text("No slots booked or blocked for this date", style: TextStyle(color: Colors.green));
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        ..._bookedSlots.map((slot) {
+          final type = slot['slotType']?.toString() ?? 'slot';
+          final start = slot['startTime']?.toString() ?? '';
+          final end = slot['endTime']?.toString() ?? '';
+          final label = type == 'full_day' ? 'Booked: Full Day' : "Booked: $type $start-$end";
+          return Chip(
+            label: Text(label, style: const TextStyle(fontSize: 11)),
+            backgroundColor: Colors.red.shade50,
+            labelStyle: TextStyle(color: Colors.red.shade700),
+          );
+        }),
+        ..._blockedSlots.map((slot) {
+          final type = slot['slotType']?.toString() ?? 'slot';
+          final start = slot['startTime']?.toString() ?? '';
+          final end = slot['endTime']?.toString() ?? '';
+          final label = type == 'full_day' ? 'Blocked: Full Day' : "Blocked: $type $start-$end";
+          return Chip(
+            label: Text(label, style: const TextStyle(fontSize: 11)),
+            backgroundColor: Colors.orange.shade50,
+            labelStyle: TextStyle(color: Colors.orange.shade700),
+          );
+        }),
+      ],
     );
   }
 }

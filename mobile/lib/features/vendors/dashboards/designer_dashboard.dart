@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme.dart';
 import 'package:mobile/core/widgets/dashboard_header.dart';
-import 'package:mobile/features/vendors/screens/designer_services_screen.dart';
 import 'package:mobile/features/bookings/screens/vendor_bookings_screen.dart';
+import 'package:mobile/features/vendors/screens/vendor_availability_screen.dart';
+import 'package:mobile/features/vendors/screens/designer_services_screen.dart';
 
 class DesignerDashboard extends StatelessWidget {
   const DesignerDashboard({super.key});
@@ -29,6 +30,15 @@ class DesignerDashboard extends StatelessWidget {
                     Icons.design_services,
                     AppTheme.primaryColor,
                     () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DesignerServicesScreen())),
+                  ),
+                  const SizedBox(height: 15),
+                  _buildActionCard(
+                    context,
+                    "Manage Availability",
+                    "Block dates and time slots",
+                    Icons.lock_clock,
+                    Colors.deepPurple,
+                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorAvailabilityScreen())),
                   ),
                   const SizedBox(height: 15),
                   _buildActionCard(

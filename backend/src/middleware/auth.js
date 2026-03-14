@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
+const { JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE } = require('../config/env');
 
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization || '';
@@ -9,7 +9,13 @@ function verifyToken(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!JWT_SECRET) {
+      return res.status(500).json({ message: 'Server auth misconfiguration' });
+    }
+    const verifyOptions = { algorithms: ['HS256'] };
+    if (JWT_ISSUER) verifyOptions.issuer = JWT_ISSUER;
+    if (JWT_AUDIENCE) verifyOptions.audience = JWT_AUDIENCE;
+    const decoded = jwt.verify(token, JWT_SECRET, verifyOptions);
     req.user = decoded;
     return next();
   } catch (error) {

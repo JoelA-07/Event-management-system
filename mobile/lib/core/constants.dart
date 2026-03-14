@@ -5,6 +5,8 @@ class AppConstants {
   // Endpoints
   static const String loginUrl = "$baseUrl/auth/login";
   static const String registerUrl = "$baseUrl/auth/register";
+  static const String refreshUrl = "$baseUrl/auth/refresh";
+  static const String logoutUrl = "$baseUrl/auth/logout";
 
   // Hall Endpoints
   static const String allHallsUrl = "$baseUrl/halls/all";

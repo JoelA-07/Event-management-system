@@ -11,6 +11,10 @@ class VendorBookingService {
     required int customerId,
     required String bookingDate,
     String? notes,
+    String slotType = 'full_day',
+    String? startTime,
+    String? endTime,
+    String? slotLabel,
   }) async {
     try {
       return await _dio.post(
@@ -21,6 +25,10 @@ class VendorBookingService {
           "customerId": customerId,
           "bookingDate": bookingDate,
           "notes": notes,
+          "slotType": slotType,
+          "startTime": startTime,
+          "endTime": endTime,
+          "slotLabel": slotLabel,
         },
       );
     } on DioException catch (e) {
@@ -45,4 +53,88 @@ class VendorBookingService {
       return [];
     }
   }
+
+  Future<List<dynamic>> fetchVendorBookedSlots({
+    required int vendorId,
+    required int serviceId,
+    required String date,
+  }) async {
+    try {
+      final response = await _dio.get(
+        "${AppConstants.baseUrl}/vendor-bookings/vendor/$vendorId/service/$serviceId/booked-slots",
+        queryParameters: {"date": date},
+      );
+      return List<dynamic>.from(response.data);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<dynamic>> fetchVendorUnavailableSlots({
+    required int vendorId,
+    required int serviceId,
+    required String date,
+  }) async {
+    try {
+      final response = await _dio.get(
+        "${AppConstants.baseUrl}/vendor-bookings/vendor/$vendorId/service/$serviceId/unavailable-slots",
+        queryParameters: {"date": date},
+      );
+      return List<dynamic>.from(response.data);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<Response?> blockVendorSlot({
+    required int vendorId,
+    required int serviceId,
+    required String date,
+    String slotType = 'full_day',
+    String? startTime,
+    String? endTime,
+    String? slotLabel,
+    String? reason,
+  }) async {
+    try {
+      return await _dio.post(
+        "${AppConstants.baseUrl}/vendor-bookings/vendor/$vendorId/service/$serviceId/unavailable-slots",
+        data: {
+          "date": date,
+          "slotType": slotType,
+          "startTime": startTime,
+          "endTime": endTime,
+          "slotLabel": slotLabel,
+          "reason": reason,
+        },
+      );
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
+  Future<Response?> unblockVendorSlot(int id) async {
+    try {
+      return await _dio.delete(
+        "${AppConstants.baseUrl}/vendor-bookings/vendor/unavailable-slots/$id",
+      );
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
+  Future<Response?> updateBookingStatus({
+    required int bookingId,
+    required String status,
+  }) async {
+    try {
+      return await _dio.patch(
+        "${AppConstants.baseUrl}/vendor-bookings/$bookingId/status",
+        data: {"status": status},
+      );
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
 }

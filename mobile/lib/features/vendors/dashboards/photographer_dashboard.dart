@@ -5,6 +5,7 @@ import 'package:mobile/core/theme.dart';
 import 'package:mobile/core/widgets/dashboard_header.dart';
 import 'package:mobile/features/vendors/screens/vendor_photography_screen.dart';
 import 'package:mobile/features/bookings/screens/vendor_bookings_screen.dart';
+import 'package:mobile/features/vendors/screens/vendor_availability_screen.dart';
 
 class PhotographerDashboard extends StatefulWidget {
   const PhotographerDashboard({super.key});
@@ -70,6 +71,15 @@ class _PhotographerDashboardState extends State<PhotographerDashboard> {
                       Icons.camera_roll_outlined,
                       AppTheme.primaryColor,
                       () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PhotographyManagementScreen())),
+                    ),
+                    const SizedBox(height: 15),
+                    _buildActionCard(
+                      context,
+                      "Manage Availability",
+                      "Block dates and time slots",
+                      Icons.lock_clock,
+                      Colors.deepPurple,
+                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorAvailabilityScreen())),
                     ),
                     const SizedBox(height: 15),
                     _buildActionCard(

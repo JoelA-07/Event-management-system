@@ -51,11 +51,13 @@ class AuthService {
 // Inside the login function in auth_service.dart
 if (response.statusCode == 200) {
   String token = response.data['token'];
+  String refreshToken = response.data['refreshToken'];
   String role = response.data['user']['role'];
   String name = response.data['user']['name'];
   String id = response.data['user']['id'].toString(); // Get the ID from backend
 
   await _storage.write(key: "jwt_token", value: token);
+  await _storage.write(key: "refresh_token", value: refreshToken);
   await _storage.write(key: "role", value: role);
   await _storage.write(key: "name", value: name);
   await _storage.write(key: "userId", value: id); // Save the User ID!
@@ -66,9 +68,37 @@ if (response.statusCode == 200) {
     }
   }
 
+
+
+  Future<Response?> refreshToken() async {
+    try {
+      final refresh = await _storage.read(key: "refresh_token");
+      if (refresh == null || refresh.isEmpty) return null;
+      return await _dio.post(
+        AppConstants.refreshUrl,
+        data: {"refreshToken": refresh},
+      );
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
+
+  Future<String?> getRefreshToken() async {
+    return await _storage.read(key: "refresh_token");
+  }
   // 3. LOGOUT FUNCTION
   Future<void> logout() async {
+    try {
+      final refresh = await _storage.read(key: "refresh_token");
+      if (refresh != null && refresh.isNotEmpty) {
+        await _dio.post(AppConstants.logoutUrl, data: {"refreshToken": refresh});
+      }
+    } catch (_) {}
     await _storage.delete(key: "jwt_token");
+    await _storage.delete(key: "refresh_token");
+    await _storage.delete(key: "role");
+    await _storage.delete(key: "name");
+    await _storage.delete(key: "userId");
   }
 
   // 4. GET SAVED TOKEN (To check if user is already logged in)
