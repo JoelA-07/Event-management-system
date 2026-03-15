@@ -1,6 +1,10 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
+import 'package:mobile/core/constants.dart';
 import 'package:mobile/features/auth/providers/auth_provider.dart';
 import 'package:mobile/features/halls/providers/hall_provider.dart';
 import 'package:mobile/features/bookings/providers/booking_provider.dart';
@@ -43,17 +47,83 @@ class MyApp extends StatelessWidget {
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
-  Future<Map<String, String?>> _loadSession() async {
+  Future<Map<String, String?>> _restoreSession() async {
     const storage = FlutterSecureStorage();
-    final token = await storage.read(key: "jwt_token");
-    final role = await storage.read(key: "role");
+    String? token = await storage.read(key: "jwt_token");
+    String? role = await storage.read(key: "role");
+    final refresh = await storage.read(key: "refresh_token");
+
+    if ((token != null && token.isNotEmpty) && (role == null || role.isEmpty)) {
+      final decodedRole = _decodeRole(token);
+      if (decodedRole != null) {
+        role = decodedRole;
+        await storage.write(key: "role", value: decodedRole);
+      }
+    }
+
+    if ((token == null || token.isEmpty) && refresh != null && refresh.isNotEmpty) {
+      final res = await _refreshWithToken(refresh);
+      if (res != null) {
+        token = res['token'];
+        role = res['role'];
+        if (res['token'] != null) {
+          await storage.write(key: "jwt_token", value: res['token']!);
+        }
+        if (res['refreshToken'] != null) {
+          await storage.write(key: "refresh_token", value: res['refreshToken']!);
+        }
+        if (res['role'] != null) {
+          await storage.write(key: "role", value: res['role']!);
+        }
+        if (res['name'] != null) {
+          await storage.write(key: "name", value: res['name']!);
+        }
+        if (res['userId'] != null) {
+          await storage.write(key: "userId", value: res['userId']!);
+        }
+      }
+    }
+
     return {"token": token, "role": role};
+  }
+
+  String? _decodeRole(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      return data['role']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, String?>?> _refreshWithToken(String refreshToken) async {
+    try {
+      final dio = Dio();
+      final res = await dio.post(
+        AppConstants.refreshUrl,
+        data: {"refreshToken": refreshToken},
+      );
+      if (res.statusCode == 200) {
+        final user = res.data['user'] as Map<String, dynamic>?;
+        return {
+          "token": res.data['token']?.toString(),
+          "refreshToken": res.data['refreshToken']?.toString(),
+          "role": user?['role']?.toString(),
+          "name": user?['name']?.toString(),
+          "userId": user?['id']?.toString(),
+        };
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, String?>>(
-      future: _loadSession(),
+      future: _restoreSession(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(

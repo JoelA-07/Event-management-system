@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -21,8 +22,8 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
   final _descController = TextEditingController();
-  File? _selectedImage;
-  final List<File> _gallery = [];
+  XFile? _selectedXFile;
+  final List<XFile> _gallery = [];
   final List<String> _existingPortfolio = [];
   bool _isSaving = false;
 
@@ -37,14 +38,45 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
     }
   }
 
-  Future<void> _pickImage() async {
-    final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? image = await ImagePicker().pickImage(source: source, imageQuality: 80);
     if (image != null) {
-      setState(() => _selectedImage = File(image.path));
+      setState(() => _selectedXFile = image);
     }
   }
 
-  Future<void> _pickGallery() async {
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text("Choose from gallery"),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (!kIsWeb)
+                ListTile(
+                  leading: const Icon(Icons.photo_camera),
+                  title: const Text("Take a photo"),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickGalleryFromLibrary() async {
     final images = await ImagePicker().pickMultiImage(imageQuality: 80);
     if (images.isNotEmpty) {
       final available = AppConstants.maxPortfolioImages - _existingPortfolio.length - _gallery.length;
@@ -55,9 +87,55 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
         );
         return;
       }
-      final toAdd = images.take(available).map((e) => File(e.path)).toList();
+      final toAdd = images.take(available).toList();
       setState(() => _gallery.addAll(toAdd));
     }
+  }
+
+  Future<void> _pickPortfolioFromCamera() async {
+    final image = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 80);
+    if (image != null) {
+      final available = AppConstants.maxPortfolioImages - _existingPortfolio.length - _gallery.length;
+      if (available <= 0) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Portfolio limit reached")),
+        );
+        return;
+      }
+      setState(() => _gallery.add(image));
+    }
+  }
+
+  void _showPortfolioSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text("Choose from gallery"),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickGalleryFromLibrary();
+                },
+              ),
+              if (!kIsWeb)
+                ListTile(
+                  leading: const Icon(Icons.photo_camera),
+                  title: const Text("Take a photo"),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickPortfolioFromCamera();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _removeExistingImage(String url) async {
@@ -94,8 +172,16 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
       "category": "photographer",
       "price": double.parse(_priceController.text.trim()),
       "description": _descController.text.trim(),
-      if (_selectedImage != null)
-        "image": await MultipartFile.fromFile(_selectedImage!.path, filename: "photo_${DateTime.now().millisecondsSinceEpoch}.jpg"),
+      if (_selectedXFile != null)
+        "image": kIsWeb
+            ? MultipartFile.fromBytes(
+                await _selectedXFile!.readAsBytes(),
+                filename: _selectedXFile!.name,
+              )
+            : await MultipartFile.fromFile(
+                _selectedXFile!.path,
+                filename: "photo_${DateTime.now().millisecondsSinceEpoch}.jpg",
+              ),
     });
 
     final service = VendorService();
@@ -111,7 +197,7 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
       if (serviceId != null && _gallery.isNotEmpty) {
         await service.uploadServiceImages(
           serviceId,
-          _gallery.map((f) => f.path).toList(),
+          _gallery,
         );
       }
       Navigator.pop(context, true);
@@ -136,7 +222,7 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
           child: Column(
             children: [
               GestureDetector(
-                onTap: _pickImage,
+                onTap: _showImageSourcePicker,
                 child: Container(
                   height: 180,
                   width: double.infinity,
@@ -145,7 +231,7 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
                   ),
-                  child: _selectedImage == null
+                  child: _selectedXFile == null
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -156,7 +242,9 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
                         )
                       : ClipRRect(
                           borderRadius: BorderRadius.circular(14),
-                          child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                          child: kIsWeb
+                              ? Image.network(_selectedXFile!.path, fit: BoxFit.cover)
+                              : Image.file(File(_selectedXFile!.path), fit: BoxFit.cover),
                         ),
                 ),
               ),
@@ -164,7 +252,7 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
               Row(
                 children: [
                   OutlinedButton.icon(
-                    onPressed: _pickGallery,
+                    onPressed: _showPortfolioSourcePicker,
                     icon: const Icon(Icons.collections),
                     label: Text("Add Portfolio Images (${_existingPortfolio.length + _gallery.length}/${AppConstants.maxPortfolioImages})"),
                   ),
@@ -259,7 +347,9 @@ class _PhotographerServiceFormScreenState extends State<PhotographerServiceFormS
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.file(file, width: 110, height: 90, fit: BoxFit.cover),
+                child: kIsWeb
+                ? Image.network(file.path, width: 110, height: 90, fit: BoxFit.cover)
+                : Image.file(File(file.path), width: 110, height: 90, fit: BoxFit.cover),
               ),
               Positioned(
                 right: 4,

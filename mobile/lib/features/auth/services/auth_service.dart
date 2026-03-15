@@ -51,13 +51,15 @@ class AuthService {
 // Inside the login function in auth_service.dart
 if (response.statusCode == 200) {
   String token = response.data['token'];
-  String refreshToken = response.data['refreshToken'];
+  String? refreshToken = response.data['refreshToken'];
   String role = response.data['user']['role'];
   String name = response.data['user']['name'];
   String id = response.data['user']['id'].toString(); // Get the ID from backend
 
   await _storage.write(key: "jwt_token", value: token);
-  await _storage.write(key: "refresh_token", value: refreshToken);
+  if (refreshToken != null && refreshToken.isNotEmpty) {
+    await _storage.write(key: "refresh_token", value: refreshToken);
+  }
   await _storage.write(key: "role", value: role);
   await _storage.write(key: "name", value: name);
   await _storage.write(key: "userId", value: id); // Save the User ID!

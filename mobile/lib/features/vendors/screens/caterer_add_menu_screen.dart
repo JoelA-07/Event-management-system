@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -21,7 +22,7 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
   final _samplePriceController = TextEditingController();
   bool _isSampleAvailable = true;
   bool _isSaving = false;
-  File? _selectedImage;
+  XFile? _selectedXFile;
 
   @override
   void initState() {
@@ -35,11 +36,42 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? image = await ImagePicker().pickImage(source: source, imageQuality: 80);
     if (image != null) {
-      setState(() => _selectedImage = File(image.path));
+      setState(() => _selectedXFile = image);
     }
+  }
+
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text("Choose from gallery"),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (!kIsWeb)
+                ListTile(
+                  leading: const Icon(Icons.photo_camera),
+                  title: const Text("Take a photo"),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _submitMenu() async {
@@ -71,8 +103,16 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
         "pricePerPlate": double.parse(_priceController.text.trim()),
         "samplePrice": samplePrice,
         "isSampleAvailable": _isSampleAvailable,
-        if (_selectedImage != null)
-          "image": await MultipartFile.fromFile(_selectedImage!.path, filename: "menu_${DateTime.now().millisecondsSinceEpoch}.jpg"),
+        if (_selectedXFile != null)
+          "image": kIsWeb
+              ? MultipartFile.fromBytes(
+                  await _selectedXFile!.readAsBytes(),
+                  filename: _selectedXFile!.name,
+                )
+              : await MultipartFile.fromFile(
+                  _selectedXFile!.path,
+                  filename: "menu_${DateTime.now().millisecondsSinceEpoch}.jpg",
+                ),
       });
 
       final res = widget.existing == null
@@ -112,7 +152,7 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
         child: Column(
           children: [
             GestureDetector(
-              onTap: _pickImage,
+              onTap: _showImageSourcePicker,
               child: Container(
                 height: 160,
                 width: double.infinity,
@@ -121,7 +161,7 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
                 ),
-                child: _selectedImage == null
+                child: _selectedXFile == null
                     ? const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -132,7 +172,9 @@ class _AddCateringMenuScreenState extends State<AddCateringMenuScreen> {
                       )
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(14),
-                        child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                        child: kIsWeb
+                              ? Image.network(_selectedXFile!.path, fit: BoxFit.cover)
+                              : Image.file(File(_selectedXFile!.path), fit: BoxFit.cover),
                       ),
               ),
             ),

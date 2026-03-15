@@ -1,4 +1,5 @@
 import 'dart:io'; // Required for File
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -24,25 +25,60 @@ class _AddHallScreenState extends State<AddHallScreen> {
 
   // IMAGE PICKER LOGIC
   File? _selectedImage;
+  XFile? _selectedXFile;
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImage(ImageSource source) async {
     final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 80, // Compress slightly for faster upload
     );
     if (image != null) {
       setState(() {
-        _selectedImage = File(image.path);
+        _selectedXFile = image;
+        if (!kIsWeb) {
+          _selectedImage = File(image.path);
+        }
       });
     }
+  }
+
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text("Choose from gallery"),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (!kIsWeb)
+                ListTile(
+                  leading: const Icon(Icons.photo_camera),
+                  title: const Text("Take a photo"),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _submit() async {
     // 1. Basic Validation
     if (!_formKey.currentState!.validate()) return;
     
-    if (_selectedImage == null) {
+    if (_selectedXFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select an image for the hall")),
       );
@@ -64,10 +100,15 @@ class _AddHallScreenState extends State<AddHallScreen> {
       "description": _descController.text,
       "ownerId": currentUserId,
       // The key 'image' must match the backend upload.single('image')
-      "image": await MultipartFile.fromFile(
-        _selectedImage!.path,
-        filename: "hall_upload.jpg",
-      ),
+      "image": kIsWeb
+          ? MultipartFile.fromBytes(
+              await _selectedXFile!.readAsBytes(),
+              filename: _selectedXFile!.name,
+            )
+          : await MultipartFile.fromFile(
+              _selectedImage!.path,
+              filename: "hall_upload.jpg",
+            ),
     });
 
     // 3. Call Provider (Now passing FormData instead of a Map)
@@ -103,7 +144,7 @@ class _AddHallScreenState extends State<AddHallScreen> {
               const Text("Venue Photo", style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               GestureDetector(
-                onTap: _pickImage,
+                onTap: _showImageSourcePicker,
                 child: Container(
                   height: 200,
                   width: double.infinity,
@@ -112,7 +153,7 @@ class _AddHallScreenState extends State<AddHallScreen> {
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
                   ),
-                  child: _selectedImage == null
+                  child: _selectedXFile == null
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -123,7 +164,9 @@ class _AddHallScreenState extends State<AddHallScreen> {
                         )
                       : ClipRRect(
                           borderRadius: BorderRadius.circular(15),
-                          child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                          child: kIsWeb
+                              ? Image.network(_selectedXFile!.path, fit: BoxFit.cover)
+                              : Image.file(_selectedImage!, fit: BoxFit.cover),
                         ),
                 ),
               ),

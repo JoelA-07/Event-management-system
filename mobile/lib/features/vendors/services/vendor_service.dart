@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile/core/constants.dart';
 import 'package:mobile/features/vendors/models/vendor_model.dart';
 import 'package:mobile/core/api_client.dart';
@@ -69,15 +71,23 @@ class VendorService {
     }
   }
 
-  Future<Response?> uploadServiceImages(int id, List<String> filePaths) async {
+  Future<Response?> uploadServiceImages(int id, List<XFile> files) async {
     try {
-      final files = await Future.wait(
-        filePaths.map(
-          (path) => MultipartFile.fromFile(path, filename: path.split(RegExp(r'[\\\\/]')).last),
+      final multipartFiles = await Future.wait(
+        files.map(
+          (file) async => kIsWeb
+              ? MultipartFile.fromBytes(
+                  await file.readAsBytes(),
+                  filename: file.name,
+                )
+              : await MultipartFile.fromFile(
+                  file.path,
+                  filename: file.path.split(RegExp(r'[\\/]')).last,
+                ),
         ),
       );
       final data = FormData.fromMap({
-        "images": files,
+        "images": multipartFiles,
       });
       return await _dio.post("${AppConstants.vendorsUrl}/$id/images", data: data);
     } on DioException catch (e) {
