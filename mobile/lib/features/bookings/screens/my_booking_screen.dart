@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile/features/bookings/services/booking_service.dart';
 import 'package:mobile/core/theme.dart';
+import 'package:mobile/features/payments/screens/payment_summary_screen.dart';
 
 class MyBookingsScreen extends StatelessWidget {
   const MyBookingsScreen({super.key});
@@ -69,6 +70,20 @@ class MyBookingsScreen extends StatelessWidget {
                           color: booking['status'] == 'confirmed' ? Colors.green : Colors.orange,
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PaymentSummaryScreen(
+                              bookingType: 'hall',
+                              bookingId: int.parse(booking['id'].toString()),
+                            ),
+                          ),
+                        ),
+                        icon: const Icon(Icons.payments_outlined, size: 18),
+                        label: const Text('Payments'),
                       ),
                     ],
                   ),

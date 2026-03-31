@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile/features/vendors/services/vendor_booking_service.dart';
+import 'package:mobile/features/payments/screens/payment_summary_screen.dart';
 import 'package:mobile/core/theme.dart';
 
 class VendorBookingsScreen extends StatefulWidget {
@@ -115,6 +116,23 @@ class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(booking['notes'] ?? "No notes", style: const TextStyle(color: Colors.black87)),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => PaymentSummaryScreen(
+                                        bookingType: 'vendor',
+                                        bookingId: int.parse(booking['id'].toString()),
+                                      ),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.payments_outlined, size: 18),
+                                  label: const Text('Payments'),
+                                ),
+                              ),
                               if (status == 'pending') ...[
                                 const SizedBox(height: 12),
                                 Row(

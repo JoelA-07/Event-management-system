@@ -6,6 +6,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const hallRoutes = require('./src/routes/hallRoutes');
 const bookingRoutes = require('./src/routes/bookingRoutes');
 const vendorRoutes = require('./src/routes/vendorRoutes');
+const paymentRoutes = require('./src/routes/paymentRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const packageRoutes = require('./src/routes/packageRoutes');
 const vendorBookingRoutes = require('./src/routes/vendorBookingRoutes');
@@ -17,6 +18,9 @@ const BookingLock = require('./src/models/BookingLock');
 const VendorBooking = require('./src/models/VendorBooking');
 const VendorDateLock = require('./src/models/VendorDateLock');
 const VendorService = require('./src/models/VendorService');
+const Payment = require('./src/models/Payment');
+const PaymentTransaction = require('./src/models/PaymentTransaction');
+const Payout = require('./src/models/Payout');
 const VendorAvailability = require('./src/models/VendorAvailability');
 const User = require('./src/models/User');
 const UserSettings = require('./src/models/UserSettings');
@@ -40,13 +44,19 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use((req, res, next) => {
+  if (req.originalUrl.startsWith('/api/payments/razorpay/webhook')) {
+    return next();
+  }
+  return express.json()(req, res, next);
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/halls', hallRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/vendors', vendorRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/vendor-bookings', vendorBookingRoutes);
@@ -71,6 +81,10 @@ VendorService.hasMany(VendorBooking, { foreignKey: 'serviceId' });
 VendorBooking.belongsTo(VendorService, { foreignKey: 'serviceId' });
 VendorService.hasMany(VendorAvailability, { foreignKey: 'serviceId' });
 VendorAvailability.belongsTo(VendorService, { foreignKey: 'serviceId' });
+Payment.hasMany(PaymentTransaction, { foreignKey: 'paymentId' });
+PaymentTransaction.belongsTo(Payment, { foreignKey: 'paymentId' });
+Payment.hasMany(Payout, { foreignKey: 'paymentId' });
+Payout.belongsTo(Payment, { foreignKey: 'paymentId' });
 User.hasMany(Review, { foreignKey: 'userId' });
 Review.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(UserSettings, { foreignKey: 'userId' });
