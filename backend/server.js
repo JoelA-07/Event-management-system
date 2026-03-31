@@ -12,7 +12,9 @@ const organizerRoutes = require('./src/routes/organizerRoutes');
 const reviewRoutes = require('./src/routes/reviewRoutes');
 const Hall = require('./src/models/Hall');
 const Booking = require('./src/models/Booking');
+const BookingLock = require('./src/models/BookingLock');
 const VendorBooking = require('./src/models/VendorBooking');
+const VendorDateLock = require('./src/models/VendorDateLock');
 const VendorService = require('./src/models/VendorService');
 const VendorAvailability = require('./src/models/VendorAvailability');
 const User = require('./src/models/User');
@@ -88,4 +90,3 @@ sequelize.sync({ alter: true }) // Updates tables without dropping data
   .catch(err => {
     console.log('Database connection failed:', err);
   });
-

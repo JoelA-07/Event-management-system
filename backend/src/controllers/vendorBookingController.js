@@ -1,6 +1,9 @@
 const VendorBooking = require('../models/VendorBooking');
 const VendorService = require('../models/VendorService');
 const VendorAvailability = require('../models/VendorAvailability');
+const VendorDateLock = require('../models/VendorDateLock');
+const sequelize = require('../config/db');
+const { withTransactionRetry } = require('../utils/withTransactionRetry');
 const { Op } = require('sequelize');
 
 const SLOT_PRESETS = {
@@ -39,6 +42,26 @@ function hasOverlap(existing, next) {
   return nextStart < existingEnd && nextEnd > existingStart;
 }
 
+async function lockVendorDate(transaction, vendorId, serviceId, date) {
+  try {
+    await VendorDateLock.findOrCreate({
+      where: { vendorId, serviceId, date },
+      defaults: { vendorId, serviceId, date },
+      transaction,
+    });
+  } catch (err) {
+    if (err.name !== 'SequelizeUniqueConstraintError') {
+      throw err;
+    }
+  }
+
+  await VendorDateLock.findOne({
+    where: { vendorId, serviceId, date },
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+}
+
 exports.createVendorBooking = async (req, res) => {
   try {
     const { vendorId, serviceId, customerId, bookingDate, notes, slotType, startTime, endTime, slotLabel } = req.body;
@@ -60,36 +83,51 @@ exports.createVendorBooking = async (req, res) => {
       return res.status(400).json({ message: 'Hourly booking requires startTime and endTime' });
     }
 
-    const existingBookings = await VendorBooking.findAll({
-      where: { vendorId, serviceId, bookingDate, status: { [Op.ne]: 'cancelled' } },
-    });
-    const conflictBooking = existingBookings.find((b) => hasOverlap(b, normalized));
-    if (conflictBooking) {
-      return res.status(400).json({ message: 'This slot is already booked' });
-    }
+    const booking = await withTransactionRetry(sequelize, async (transaction) => {
+      await lockVendorDate(transaction, vendorId, serviceId, bookingDate);
 
-    const unavailable = await VendorAvailability.findAll({
-      where: { vendorId, serviceId, date: bookingDate },
-    });
-    const conflictAvailability = unavailable.find((b) => hasOverlap(b, normalized));
-    if (conflictAvailability) {
-      return res.status(400).json({ message: 'Vendor is unavailable for this slot' });
-    }
+      const existingBookings = await VendorBooking.findAll({
+        where: { vendorId, serviceId, bookingDate, status: { [Op.ne]: 'cancelled' } },
+        transaction,
+      });
+      const conflictBooking = existingBookings.find((b) => hasOverlap(b, normalized));
+      if (conflictBooking) {
+        const err = new Error('This slot is already booked');
+        err.statusCode = 400;
+        throw err;
+      }
 
-    const booking = await VendorBooking.create({
-      vendorId,
-      serviceId,
-      customerId,
-      bookingDate,
-      notes,
-      slotType: normalized.slotType,
-      startTime: normalized.startTime,
-      endTime: normalized.endTime,
+      const unavailable = await VendorAvailability.findAll({
+        where: { vendorId, serviceId, date: bookingDate },
+        transaction,
+      });
+      const conflictAvailability = unavailable.find((b) => hasOverlap(b, normalized));
+      if (conflictAvailability) {
+        const err = new Error('Vendor is unavailable for this slot');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      return VendorBooking.create(
+        {
+          vendorId,
+          serviceId,
+          customerId,
+          bookingDate,
+          notes,
+          slotType: normalized.slotType,
+          startTime: normalized.startTime,
+          endTime: normalized.endTime,
+        },
+        { transaction }
+      );
     });
 
     res.status(201).json({ message: 'Vendor booking created', booking });
   } catch (error) {
-    res.status(500).json({ message: 'Error creating booking', error: error.message });
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Error creating booking' : error.message;
+    res.status(statusCode).json({ message, error: statusCode === 500 ? error.message : undefined });
   }
 };
 
@@ -170,26 +208,39 @@ exports.addVendorUnavailableSlot = async (req, res) => {
     }
 
     const normalized = normalizeSlot({ slotType, startTime, endTime, slotLabel });
-    const existing = await VendorAvailability.findAll({
-      where: { vendorId, serviceId, date },
-    });
-    const conflict = existing.find((b) => hasOverlap(b, normalized));
-    if (conflict) {
-      return res.status(400).json({ message: 'Slot already blocked' });
-    }
+    const entry = await withTransactionRetry(sequelize, async (transaction) => {
+      await lockVendorDate(transaction, vendorId, serviceId, date);
 
-    const entry = await VendorAvailability.create({
-      vendorId,
-      serviceId,
-      date,
-      slotType: normalized.slotType,
-      startTime: normalized.startTime,
-      endTime: normalized.endTime,
-      reason,
+      const existing = await VendorAvailability.findAll({
+        where: { vendorId, serviceId, date },
+        transaction,
+      });
+      const conflict = existing.find((b) => hasOverlap(b, normalized));
+      if (conflict) {
+        const err = new Error('Slot already blocked');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      return VendorAvailability.create(
+        {
+          vendorId,
+          serviceId,
+          date,
+          slotType: normalized.slotType,
+          startTime: normalized.startTime,
+          endTime: normalized.endTime,
+          reason,
+        },
+        { transaction }
+      );
     });
+
     res.status(201).json(entry);
   } catch (error) {
-    res.status(500).json({ message: 'Error blocking slot', error: error.message });
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Error blocking slot' : error.message;
+    res.status(statusCode).json({ message, error: statusCode === 500 ? error.message : undefined });
   }
 };
 

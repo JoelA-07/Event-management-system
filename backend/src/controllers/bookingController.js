@@ -1,5 +1,8 @@
 const Booking = require('../models/Booking');
 const Hall = require('../models/Hall');
+const BookingLock = require('../models/BookingLock');
+const sequelize = require('../config/db');
+const { withTransactionRetry } = require('../utils/withTransactionRetry');
 const { Op } = require('sequelize');
 
 const SLOT_PRESETS = {
@@ -41,6 +44,26 @@ function hasOverlap(existing, next) {
   return nextStart < existingEnd && nextEnd > existingStart;
 }
 
+async function lockHallDate(transaction, hallId, bookingDate) {
+  try {
+    await BookingLock.findOrCreate({
+      where: { hallId, bookingDate },
+      defaults: { hallId, bookingDate },
+      transaction,
+    });
+  } catch (err) {
+    if (err.name !== 'SequelizeUniqueConstraintError') {
+      throw err;
+    }
+  }
+
+  await BookingLock.findOne({
+    where: { hallId, bookingDate },
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+}
+
 exports.createBooking = async (req, res) => {
   try {
     const { hallId, customerId, bookingDate, slotType, startTime, endTime, slotLabel } = req.body;
@@ -62,31 +85,43 @@ exports.createBooking = async (req, res) => {
       return res.status(400).json({ message: "Hourly booking requires startTime and endTime" });
     }
 
-    // 1. Check if hall is already booked for this date
-    const existing = await Booking.findAll({
-      where: {
-        hallId,
-        bookingDate,
-        status: { [Op.ne]: 'cancelled' },
-      },
-    });
-    const conflict = existing.find((b) => hasOverlap(b, normalized));
-    if (conflict) {
-      return res.status(400).json({ message: "This time slot is already booked!" });
-    }
+    const booking = await withTransactionRetry(sequelize, async (transaction) => {
+      await lockHallDate(transaction, hallId, bookingDate);
 
-    // 2. Create the booking
-    const booking = await Booking.create({
-      hallId,
-      customerId,
-      bookingDate,
-      slotType: normalized.slotType,
-      startTime: normalized.startTime,
-      endTime: normalized.endTime,
+      const existing = await Booking.findAll({
+        where: {
+          hallId,
+          bookingDate,
+          status: { [Op.ne]: 'cancelled' },
+        },
+        transaction,
+      });
+
+      const conflict = existing.find((b) => hasOverlap(b, normalized));
+      if (conflict) {
+        const err = new Error('This time slot is already booked!');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      return Booking.create(
+        {
+          hallId,
+          customerId,
+          bookingDate,
+          slotType: normalized.slotType,
+          startTime: normalized.startTime,
+          endTime: normalized.endTime,
+        },
+        { transaction }
+      );
     });
+
     res.status(201).json({ message: "Booking confirmed!", booking });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? "Server error" : error.message;
+    res.status(statusCode).json({ message, error: statusCode === 500 ? error.message : undefined });
   }
 };
 
