@@ -4,6 +4,7 @@ const VendorAvailability = require('../models/VendorAvailability');
 const VendorDateLock = require('../models/VendorDateLock');
 const sequelize = require('../config/db');
 const { withTransactionRetry } = require('../utils/withTransactionRetry');
+const { notifyUser, notifyOrganizers } = require('../services/notificationService');
 const { Op } = require('sequelize');
 
 const SLOT_PRESETS = {
@@ -122,6 +123,26 @@ exports.createVendorBooking = async (req, res) => {
         { transaction }
       );
     });
+
+    try {
+      await notifyUser(customerId, 'bookingAlerts', {
+        title: 'Vendor booking confirmed',
+        body: `Your vendor booking for ${bookingDate} is confirmed.`,
+        data: { type: 'vendor_booking_confirmed', bookingId: booking.id, vendorId, serviceId, bookingDate },
+      });
+      await notifyUser(vendorId, 'bookingAlerts', {
+        title: 'New booking received',
+        body: `You have a new booking on ${bookingDate}.`,
+        data: { type: 'vendor_booking_created', bookingId: booking.id, vendorId, serviceId, bookingDate },
+      });
+      await notifyOrganizers({
+        title: 'New vendor booking',
+        body: `A vendor booking was created for ${bookingDate}.`,
+        data: { type: 'vendor_booking_created', bookingId: booking.id, vendorId, serviceId, bookingDate, customerId },
+      });
+    } catch (notifyError) {
+      console.error('Failed to send vendor booking notifications:', notifyError.message);
+    }
 
     res.status(201).json({ message: 'Vendor booking created', booking });
   } catch (error) {
@@ -281,6 +302,25 @@ exports.updateVendorBookingStatus = async (req, res) => {
 
     booking.status = status;
     await booking.save();
+    try {
+      await notifyUser(booking.customerId, 'bookingAlerts', {
+        title: 'Booking status updated',
+        body: `Your vendor booking status is now ${status}.`,
+        data: { type: 'vendor_booking_status', bookingId: booking.id, status },
+      });
+      await notifyUser(booking.vendorId, 'bookingAlerts', {
+        title: 'Booking status updated',
+        body: `Booking ${booking.id} status is now ${status}.`,
+        data: { type: 'vendor_booking_status', bookingId: booking.id, status },
+      });
+      await notifyOrganizers({
+        title: 'Vendor booking status changed',
+        body: `Booking ${booking.id} status is now ${status}.`,
+        data: { type: 'vendor_booking_status', bookingId: booking.id, status },
+      });
+    } catch (notifyError) {
+      console.error('Failed to send booking status notifications:', notifyError.message);
+    }
     res.json({ message: 'Booking status updated', booking });
   } catch (error) {
     res.status(500).json({ message: 'Error updating booking status', error: error.message });

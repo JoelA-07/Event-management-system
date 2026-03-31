@@ -3,6 +3,7 @@ const Hall = require('../models/Hall');
 const BookingLock = require('../models/BookingLock');
 const sequelize = require('../config/db');
 const { withTransactionRetry } = require('../utils/withTransactionRetry');
+const { notifyUser, notifyOrganizers } = require('../services/notificationService');
 const { Op } = require('sequelize');
 
 const SLOT_PRESETS = {
@@ -116,6 +117,21 @@ exports.createBooking = async (req, res) => {
         { transaction }
       );
     });
+
+    try {
+      await notifyUser(customerId, 'bookingAlerts', {
+        title: 'Booking confirmed',
+        body: `Your booking for ${bookingDate} is confirmed.`,
+        data: { type: 'booking_confirmed', bookingId: booking.id, hallId, bookingDate },
+      });
+      await notifyOrganizers({
+        title: 'New booking',
+        body: `A new hall booking was created for ${bookingDate}.`,
+        data: { type: 'booking_created', bookingId: booking.id, hallId, bookingDate, customerId },
+      });
+    } catch (notifyError) {
+      console.error('Failed to send booking notifications:', notifyError.message);
+    }
 
     res.status(201).json({ message: "Booking confirmed!", booking });
   } catch (error) {
