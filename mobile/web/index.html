@@ -34,5 +34,6 @@
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
-</body>
+<script>\n  if ('serviceWorker' in navigator) {\n    window.addEventListener('load', function() {\n      navigator.serviceWorker.register('firebase-messaging-sw.js');\n    });\n  }\n</script>\n</body>
 </html>
+

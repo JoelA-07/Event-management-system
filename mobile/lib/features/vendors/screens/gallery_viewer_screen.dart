@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/constants.dart';
-import 'package:mobile/core/theme.dart';
 
 class GalleryViewerScreen extends StatefulWidget {
   final List<String> images;

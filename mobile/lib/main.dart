@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +16,31 @@ import 'package:mobile/features/auth/screens/login_screen.dart';
 import 'package:mobile/features/auth/screens/dashboard_selector.dart';
 import 'package:mobile/core/theme.dart';
 
-void main() {
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: 'AIzaSyBv92aYV9N3kgIPs8xcoijVqpTUfdu12qA',
+        authDomain: 'jirehevent.firebaseapp.com',
+        projectId: 'jirehevent',
+        storageBucket: 'jirehevent.firebasestorage.app',
+        messagingSenderId: '644785458469',
+        appId: '1:644785458469:web:3e711bc30906ca25e19ecc',
+        measurementId: 'G-FH3QYD9FCB',
+      ),
+    );
+  } else {
+    await Firebase.initializeApp();
+  }
+
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await FirebaseMessaging.instance.requestPermission();
+
   runApp(
     MultiProvider(
       providers: [

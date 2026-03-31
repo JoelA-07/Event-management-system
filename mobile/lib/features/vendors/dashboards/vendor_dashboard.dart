@@ -25,7 +25,7 @@ class _VendorDashboardState extends State<VendorDashboard> {
   }
 
   // Detect if the vendor is a Photographer, Caterer, etc.
-  _loadVendorRole() async {
+  Future<void> _loadVendorRole() async {
     String? r = await _storage.read(key: "role");
     setState(() {
       _role = r ?? "Vendor";

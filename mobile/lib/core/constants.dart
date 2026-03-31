@@ -5,8 +5,17 @@ class AppConstants {
   // Endpoints
   static const String loginUrl = "$baseUrl/auth/login";
   static const String registerUrl = "$baseUrl/auth/register";
+  static const String googleLoginUrl = "$baseUrl/auth/google";
+  static const String firebaseLoginUrl = "$baseUrl/auth/firebase";
   static const String refreshUrl = "$baseUrl/auth/refresh";
   static const String logoutUrl = "$baseUrl/auth/logout";
+  static const String fcmTokenUrl = "$baseUrl/auth/fcm-token";
+
+  // Google OAuth (web client ID from Google Cloud Console)
+  static const String googleWebClientId = "644785458469-jtqi6be6ras593ck4gfd0p8i7ikugc49.apps.googleusercontent.com";
+
+  // Web Push (Firebase Console -> Cloud Messaging -> Web Push certificates)
+  static const String webPushVapidKey = "BFqY47rR49Ao1zfZ9WvRNeIgYnY6vd0l4FFFwQpW51Mz5KbdL23XIdFXFal4m_58Nhi-7dS03aTIRoGnB1NwfKY";
 
   // Hall Endpoints
   static const String allHallsUrl = "$baseUrl/halls/all";

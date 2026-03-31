@@ -22,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isLoading = context.watch<AuthProvider>().isLoading;
 
-  void _handleLogin() async {
+  void handleLogin() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     String email = _emailController.text.trim();
@@ -52,6 +52,26 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } else {
       print("Login failed: $error");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  void handleGoogleLogin() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    String? error = await authProvider.googleLogin();
+
+    if (error == null) {
+      const storage = FlutterSecureStorage();
+      String? role = await storage.read(key: "role");
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardSelector(role: role ?? 'customer')),
+        );
+      }
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
     }
   }
@@ -123,9 +143,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       isLoading
                           ? const CircularProgressIndicator()
                           : ElevatedButton(
-                              onPressed: _handleLogin,
+                              onPressed: handleLogin,
                               child: const Text("LOGIN", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                             ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: isLoading ? null : handleGoogleLogin,
+                        icon: const Icon(Icons.g_mobiledata, size: 28, color: AppTheme.primaryColor),
+                        label: const Text("Continue with Google"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primaryColor,
+                          side: const BorderSide(color: AppTheme.primaryColor),
+                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+                        ),
+                      ),
                       const SizedBox(height: 20),
                       TextButton(
                         onPressed: () {

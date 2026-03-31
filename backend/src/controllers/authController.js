@@ -2,7 +2,9 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { JWT_SECRET, JWT_EXPIRES_IN, JWT_ISSUER, JWT_AUDIENCE, REFRESH_TOKEN_EXPIRES_IN_DAYS } = require('../config/env');
+const { OAuth2Client } = require('google-auth-library');
+const { JWT_SECRET, JWT_EXPIRES_IN, JWT_ISSUER, JWT_AUDIENCE, REFRESH_TOKEN_EXPIRES_IN_DAYS, GOOGLE_WEB_CLIENT_ID, GOOGLE_WEB_CLIENT_SECRET } = require('../config/env');
+const { getFirebaseAdmin } = require('../config/firebaseAdmin');
 
 function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -13,6 +15,55 @@ function getSignOptions() {
   if (JWT_ISSUER) signOptions.issuer = JWT_ISSUER;
   if (JWT_AUDIENCE) signOptions.audience = JWT_AUDIENCE;
   return signOptions;
+}
+
+function getGoogleClient() {
+  if (!GOOGLE_WEB_CLIENT_ID || !GOOGLE_WEB_CLIENT_SECRET) {
+    throw new Error('Google OAuth is not configured');
+  }
+  return new OAuth2Client(GOOGLE_WEB_CLIENT_ID, GOOGLE_WEB_CLIENT_SECRET, 'postmessage');
+}
+
+async function findOrCreateGoogleUser(profile) {
+  const { email, name } = profile;
+  let user = await User.findOne({ where: { email } });
+  if (user) {
+    return user;
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const randomPassword = crypto.randomBytes(32).toString('hex');
+  const hashedPassword = await bcrypt.hash(randomPassword, salt);
+
+  user = await User.create({
+    name: name || email?.split('@')[0] || 'Google User',
+    email,
+    password: hashedPassword,
+    role: 'customer',
+  });
+
+  return user;
+}
+
+async function findOrCreateFirebaseUser(profile) {
+  const { email, name } = profile;
+  let user = await User.findOne({ where: { email } });
+  if (user) {
+    return user;
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const randomPassword = crypto.randomBytes(32).toString('hex');
+  const hashedPassword = await bcrypt.hash(randomPassword, salt);
+
+  user = await User.create({
+    name: name || email?.split('@')[0] || 'Google User',
+    email,
+    password: hashedPassword,
+    role: 'customer',
+  });
+
+  return user;
 }
 
 async function issueTokens(user) {
@@ -101,6 +152,74 @@ exports.login = async (req, res) => {
   }
 };
 
+exports.googleLogin = async (req, res) => {
+  try {
+    const { serverAuthCode, idToken } = req.body;
+    if (!serverAuthCode) {
+      return res.status(400).json({ message: 'Missing serverAuthCode' });
+    }
+
+    const client = getGoogleClient();
+    const { tokens } = await client.getToken(serverAuthCode);
+    const tokenToVerify = tokens?.id_token || idToken;
+    if (!tokenToVerify) {
+      return res.status(400).json({ message: 'Missing id token' });
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: tokenToVerify,
+      audience: GOOGLE_WEB_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.email) {
+      return res.status(400).json({ message: 'Google account email not found' });
+    }
+
+    const user = await findOrCreateGoogleUser({
+      email: payload.email,
+      name: payload.name,
+    });
+
+    const { accessToken, refreshToken } = await issueTokens(user);
+    res.json({
+      token: accessToken,
+      refreshToken,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Google login failed', error: error.message });
+  }
+};
+
+exports.firebaseLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ message: 'Missing Firebase ID token' });
+    }
+
+    const admin = getFirebaseAdmin();
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const email = decoded?.email;
+    const name = decoded?.name || decoded?.displayName;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Firebase account email not found' });
+    }
+
+    const user = await findOrCreateFirebaseUser({ email, name });
+    const { accessToken, refreshToken } = await issueTokens(user);
+
+    res.json({
+      token: accessToken,
+      refreshToken,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Firebase login failed', error: error.message });
+  }
+};
+
 exports.refresh = async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -143,5 +262,26 @@ exports.logout = async (req, res) => {
     return res.json({ message: 'Logged out' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.updateFcmToken = async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    if (!fcmToken) {
+      return res.status(400).json({ message: 'Missing FCM token' });
+    }
+
+    const user = await User.findByPk(req.user?.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.fcmToken = fcmToken;
+    await user.save();
+
+    return res.json({ message: 'FCM token saved' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to save FCM token' });
   }
 };

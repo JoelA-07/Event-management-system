@@ -27,7 +27,7 @@ class _PackageBuilderScreenState extends State<PackageBuilderScreen> {
     _loadData();
   }
 
-  _loadData() async {
+  Future<void> _loadData() async {
     final data = await _service.fetchAllSelectables();
     setState(() {
       _halls = data['halls']!;

@@ -35,6 +35,8 @@ const User = sequelize.define('User', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  fcmToken: {\n    type: DataTypes.STRING,\n    allowNull: true,\n  },\n  fcmPlatform: {\n    type: DataTypes.STRING,\n    allowNull: true,\n  },
 });
 
 module.exports = User;
+

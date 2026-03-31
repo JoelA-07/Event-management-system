@@ -24,4 +24,21 @@ class AuthProvider with ChangeNotifier {
       return response?.data['message'] ?? "Login failed";
     }
   }
+
+  Future<String?> googleLogin() async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await _authService.googleLogin();
+
+    _isLoading = false;
+    notifyListeners();
+
+    if (response?.statusCode == 200) {
+      return null;
+    } else {
+      return response?.data['message'] ?? "Google login failed";
+    }
+  }
+
 }

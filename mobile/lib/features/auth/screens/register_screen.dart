@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:mobile/features/auth/services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -114,7 +113,7 @@ void _handleRegister() async {
             
             // ROLE DROPDOWN
             DropdownButtonFormField(
-              value: _selectedRole,
+              initialValue: _selectedRole,
               decoration: const InputDecoration(labelText: "Register As"),
               items: _roles.map((role) => DropdownMenuItem(
                 value: role, 

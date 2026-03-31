@@ -150,7 +150,7 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   DropdownButtonFormField<VendorModel>(
-                    value: _selectedService,
+                    initialValue: _selectedService,
                     items: _services
                         .map((s) => DropdownMenuItem(value: s, child: Text(s.name)))
                         .toList(),
