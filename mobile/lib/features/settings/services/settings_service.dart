@@ -23,6 +23,10 @@ class SettingsService {
     return _storage.read(key: key);
   }
 
+  Future<void> writeValue(String key, String value) async {
+    await _storage.write(key: key, value: value);
+  }
+
   Future<void> clearSettingsOnly() async {
     await _storage.delete(key: bookingAlertsKey);
     await _storage.delete(key: paymentAlertsKey);

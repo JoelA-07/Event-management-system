@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/features/settings/services/settings_service.dart';
+import 'package:mobile/features/settings/services/user_settings_api_service.dart';
 import 'package:mobile/core/theme.dart';
 import 'package:mobile/features/bookings/screens/my_booking_screen.dart';
 
@@ -12,10 +13,12 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final SettingsService _settingsService = SettingsService();
+  final UserSettingsApiService _settingsApi = UserSettingsApiService();
 
   String _name = "User";
   String _role = "customer";
   String? _email;
+  String? _phone;
 
   bool _isLoading = true;
   bool _bookingAlerts = true;
@@ -31,47 +34,101 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfileAndSettings() async {
-    final name = await _settingsService.readValue("name");
-    final role = await _settingsService.readValue("role");
-    final email = await _settingsService.readValue("email");
+    setState(() => _isLoading = true);
 
-    final bookingAlerts = await _settingsService.readBool(
-      SettingsService.bookingAlertsKey,
-      defaultValue: true,
-    );
-    final paymentAlerts = await _settingsService.readBool(
-      SettingsService.paymentAlertsKey,
-      defaultValue: true,
-    );
-    final promoAlerts = await _settingsService.readBool(
-      SettingsService.promoAlertsKey,
-      defaultValue: false,
-    );
-    final profileVisible = await _settingsService.readBool(
-      SettingsService.profileVisibleKey,
-      defaultValue: true,
-    );
-    final analyticsEnabled = await _settingsService.readBool(
-      SettingsService.analyticsKey,
-      defaultValue: true,
-    );
+    final profile = await _settingsApi.fetchProfile();
+    if (profile != null) {
+      _name = (profile['name']?.toString().trim().isNotEmpty ?? false)
+          ? profile['name'].toString()
+          : "User";
+      _role = profile['role']?.toString() ?? "customer";
+      _email = profile['email']?.toString();
+      _phone = profile['phone']?.toString();
 
-    if (!mounted) return;
-    setState(() {
+      await _settingsService.writeValue("name", _name);
+      if (_email != null) {
+        await _settingsService.writeValue("email", _email!);
+      }
+      await _settingsService.writeValue("role", _role);
+      if (_phone != null) {
+        await _settingsService.writeValue("phone", _phone!);
+      }
+    } else {
+      final name = await _settingsService.readValue("name");
+      final role = await _settingsService.readValue("role");
+      final email = await _settingsService.readValue("email");
+      final phone = await _settingsService.readValue("phone");
+
       _name = (name == null || name.isEmpty) ? "User" : name;
       _role = role ?? "customer";
       _email = email;
-      _bookingAlerts = bookingAlerts;
-      _paymentAlerts = paymentAlerts;
-      _promoAlerts = promoAlerts;
-      _profileVisible = profileVisible;
-      _analyticsEnabled = analyticsEnabled;
-      _isLoading = false;
-    });
+      _phone = phone;
+    }
+
+    final settings = await _settingsApi.fetchSettings();
+    if (settings != null) {
+      _bookingAlerts = settings['bookingAlerts'] ?? true;
+      _paymentAlerts = settings['paymentAlerts'] ?? true;
+      _promoAlerts = settings['promoAlerts'] ?? false;
+      _profileVisible = settings['profileVisible'] ?? true;
+      _analyticsEnabled = settings['analyticsEnabled'] ?? true;
+
+      await _settingsService.writeBool(SettingsService.bookingAlertsKey, _bookingAlerts);
+      await _settingsService.writeBool(SettingsService.paymentAlertsKey, _paymentAlerts);
+      await _settingsService.writeBool(SettingsService.promoAlertsKey, _promoAlerts);
+      await _settingsService.writeBool(SettingsService.profileVisibleKey, _profileVisible);
+      await _settingsService.writeBool(SettingsService.analyticsKey, _analyticsEnabled);
+    } else {
+      _bookingAlerts = await _settingsService.readBool(
+        SettingsService.bookingAlertsKey,
+        defaultValue: true,
+      );
+      _paymentAlerts = await _settingsService.readBool(
+        SettingsService.paymentAlertsKey,
+        defaultValue: true,
+      );
+      _promoAlerts = await _settingsService.readBool(
+        SettingsService.promoAlertsKey,
+        defaultValue: false,
+      );
+      _profileVisible = await _settingsService.readBool(
+        SettingsService.profileVisibleKey,
+        defaultValue: true,
+      );
+      _analyticsEnabled = await _settingsService.readBool(
+        SettingsService.analyticsKey,
+        defaultValue: true,
+      );
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
   }
 
-  Future<void> _updateSwitch(String key, bool value) async {
+  Future<bool> _updateSwitch(String key, bool value) async {
+    final fieldMap = {
+      SettingsService.bookingAlertsKey: 'bookingAlerts',
+      SettingsService.paymentAlertsKey: 'paymentAlerts',
+      SettingsService.promoAlertsKey: 'promoAlerts',
+      SettingsService.profileVisibleKey: 'profileVisible',
+      SettingsService.analyticsKey: 'analyticsEnabled',
+    };
+
+    final apiField = fieldMap[key];
+    if (apiField == null) return false;
+
+    final updates = {apiField: value};
+    final result = await _settingsApi.updateSettings(updates);
+    if (result == null) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Could not update setting"), backgroundColor: Colors.red),
+      );
+      return false;
+    }
+
     await _settingsService.writeBool(key, value);
+    return true;
   }
 
   Future<void> _handleLogout() async {
@@ -117,6 +174,182 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _openEditProfile() async {
+    final nameController = TextEditingController(text: _name);
+    final emailController = TextEditingController(text: _email ?? "");
+    final phoneController = TextEditingController(text: _phone ?? "");
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    final shouldRefresh = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) => AlertDialog(
+            title: const Text("Edit Profile"),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: "Full Name"),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return "Name is required";
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: "Email"),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return "Email is required";
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: phoneController,
+                    decoration: const InputDecoration(labelText: "Phone (optional)"),
+                    keyboardType: TextInputType.phone,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+              ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if (!formKey.currentState!.validate()) return;
+                        setStateDialog(() => isSaving = true);
+                        final updated = await _settingsApi.updateProfile(
+                          name: nameController.text.trim(),
+                          email: emailController.text.trim(),
+                          phone: phoneController.text.trim().isEmpty
+                              ? null
+                              : phoneController.text.trim(),
+                        );
+                        setStateDialog(() => isSaving = false);
+
+                        if (updated == null) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Failed to update profile"), backgroundColor: Colors.red),
+                          );
+                          return;
+                        }
+
+                        if (!mounted) return;
+                        Navigator.pop(context, true);
+                      },
+                child: isSaving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text("Save"),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (shouldRefresh == true) {
+      await _loadProfileAndSettings();
+    }
+  }
+
+  Future<void> _openChangePassword() async {
+    final currentController = TextEditingController();
+    final newController = TextEditingController();
+    final confirmController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) => AlertDialog(
+            title: const Text("Change Password"),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: currentController,
+                    decoration: const InputDecoration(labelText: "Current Password"),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return "Current password is required";
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: newController,
+                    decoration: const InputDecoration(labelText: "New Password"),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.length < 8) {
+                        return "Use at least 8 characters";
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: confirmController,
+                    decoration: const InputDecoration(labelText: "Confirm New Password"),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value != newController.text) {
+                        return "Passwords do not match";
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+              ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if (!formKey.currentState!.validate()) return;
+                        setStateDialog(() => isSaving = true);
+                        final message = await _settingsApi.changePassword(
+                          currentPassword: currentController.text,
+                          newPassword: newController.text,
+                        );
+                        setStateDialog(() => isSaving = false);
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(message ?? "Password updated")),
+                        );
+                      },
+                child: isSaving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text("Update"),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -136,9 +369,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: "Booking Updates",
                     subtitle: "Get alerts for booking confirmation and status changes",
                     value: _bookingAlerts,
-                    onChanged: (value) {
+                    onChanged: (value) async {
+                      final previous = _bookingAlerts;
                       setState(() => _bookingAlerts = value);
-                      _updateSwitch(SettingsService.bookingAlertsKey, value);
+                      final ok = await _updateSwitch(SettingsService.bookingAlertsKey, value);
+                      if (!ok && mounted) {
+                        setState(() => _bookingAlerts = previous);
+                      }
                     },
                   ),
                   _buildSwitchTile(
@@ -146,9 +383,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: "Payment Alerts",
                     subtitle: "Get payment success/failure and refund updates",
                     value: _paymentAlerts,
-                    onChanged: (value) {
+                    onChanged: (value) async {
+                      final previous = _paymentAlerts;
                       setState(() => _paymentAlerts = value);
-                      _updateSwitch(SettingsService.paymentAlertsKey, value);
+                      final ok = await _updateSwitch(SettingsService.paymentAlertsKey, value);
+                      if (!ok && mounted) {
+                        setState(() => _paymentAlerts = previous);
+                      }
                     },
                   ),
                   _buildSwitchTile(
@@ -156,9 +397,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: "Offers and Promotions",
                     subtitle: "Get discount and package offer notifications",
                     value: _promoAlerts,
-                    onChanged: (value) {
+                    onChanged: (value) async {
+                      final previous = _promoAlerts;
                       setState(() => _promoAlerts = value);
-                      _updateSwitch(SettingsService.promoAlertsKey, value);
+                      final ok = await _updateSwitch(SettingsService.promoAlertsKey, value);
+                      if (!ok && mounted) {
+                        setState(() => _promoAlerts = previous);
+                      }
                     },
                   ),
                   _buildSwitchTile(
@@ -166,9 +411,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: "Profile Visibility",
                     subtitle: "Allow organizers/vendors to view your public profile",
                     value: _profileVisible,
-                    onChanged: (value) {
+                    onChanged: (value) async {
+                      final previous = _profileVisible;
                       setState(() => _profileVisible = value);
-                      _updateSwitch(SettingsService.profileVisibleKey, value);
+                      final ok = await _updateSwitch(SettingsService.profileVisibleKey, value);
+                      if (!ok && mounted) {
+                        setState(() => _profileVisible = previous);
+                      }
                     },
                   ),
                   _buildSwitchTile(
@@ -176,10 +425,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: "Analytics Sharing",
                     subtitle: "Share anonymous usage data to improve app quality",
                     value: _analyticsEnabled,
-                    onChanged: (value) {
+                    onChanged: (value) async {
+                      final previous = _analyticsEnabled;
                       setState(() => _analyticsEnabled = value);
-                      _updateSwitch(SettingsService.analyticsKey, value);
+                      final ok = await _updateSwitch(SettingsService.analyticsKey, value);
+                      if (!ok && mounted) {
+                        setState(() => _analyticsEnabled = previous);
+                      }
                     },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSectionTitle("Account and Security"),
+                  _buildActionTile(
+                    icon: Icons.person_outline,
+                    title: "Edit Profile",
+                    subtitle: "Update your name, email, and phone",
+                    onTap: _openEditProfile,
+                  ),
+                  _buildActionTile(
+                    icon: Icons.lock_outline,
+                    title: "Change Password",
+                    subtitle: "Update your account password",
+                    onTap: _openChangePassword,
                   ),
                   const SizedBox(height: 16),
                   _buildSectionTitle("Account and Support"),
@@ -270,6 +537,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _email ?? "Email not available",
                   style: const TextStyle(color: Colors.black54, fontSize: 12),
                 ),
+                if (_phone != null && _phone!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _phone!,
+                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
+                ],
                 const SizedBox(height: 2),
                 Text(
                   _role.toUpperCase(),

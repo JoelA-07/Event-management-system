@@ -150,6 +150,7 @@ class AuthService {
     String? refreshToken = response.data['refreshToken'];
     String role = response.data['user']['role'];
     String name = response.data['user']['name'];
+    String email = response.data['user']['email'];
     String id = response.data['user']['id'].toString();
 
     await _storage.write(key: "jwt_token", value: token);
@@ -158,6 +159,7 @@ class AuthService {
     }
     await _storage.write(key: "role", value: role);
     await _storage.write(key: "name", value: name);
+    await _storage.write(key: "email", value: email);
     await _storage.write(key: "userId", value: id);
     await _syncFcmToken();
   }
@@ -242,6 +244,7 @@ class AuthService {
     await _storage.delete(key: "refresh_token");
     await _storage.delete(key: "role");
     await _storage.delete(key: "name");
+    await _storage.delete(key: "email");
     await _storage.delete(key: "userId");
   }
 

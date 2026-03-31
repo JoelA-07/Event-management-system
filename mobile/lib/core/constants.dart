@@ -25,6 +25,10 @@ class AppConstants {
   static const String createBookingUrl = "$baseUrl/bookings/create";
   static const String bookedDatesUrl = "$baseUrl/bookings/booked-dates";
 
+    // User Settings
+  static const String userMeUrl = "$baseUrl/users/me";
+  static const String userSettingsUrl = "$baseUrl/users/me/settings";
+  static const String userChangePasswordUrl = "$baseUrl/users/me/change-password";
   // Vendor Endpoints
   static const String vendorsUrl = "$baseUrl/vendors";
 
@@ -34,3 +38,4 @@ class AppConstants {
   // UI Limits
   static const int maxPortfolioImages = 10;
 }
+
