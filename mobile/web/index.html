@@ -19,6 +19,7 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
+  <meta name="google-signin-client_id" content="644785458469-jtqi6be6ras593ck4gfd0p8i7ikugc49.apps.googleusercontent.com">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -34,6 +35,13 @@
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
-<script>\n  if ('serviceWorker' in navigator) {\n    window.addEventListener('load', function() {\n      navigator.serviceWorker.register('firebase-messaging-sw.js');\n    });\n  }\n</script>\n</body>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('firebase-messaging-sw.js');
+      });
+    }
+  </script>
+</body>
 </html>
 

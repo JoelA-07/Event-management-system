@@ -1,6 +1,8 @@
 const dotenv = require('dotenv');
+const path = require('path');
 
-dotenv.config();
+// Ensure we always load backend/.env regardless of CWD
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const required = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST', 'JWT_SECRET'];
 const missing = required.filter((key) => !process.env[key]);

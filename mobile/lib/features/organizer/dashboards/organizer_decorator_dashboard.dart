@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile/features/vendors/services/vendor_service.dart';
 import 'package:mobile/features/vendors/services/vendor_booking_service.dart';
@@ -166,7 +166,9 @@ class _OrganizerDecoratorDashboardState extends State<OrganizerDecoratorDashboar
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ListTile(
-              contentPadding: const EdgeInsets.all(12),
+              dense: true,
+              visualDensity: const VisualDensity(vertical: -2),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.network(
@@ -184,35 +186,48 @@ class _OrganizerDecoratorDashboardState extends State<OrganizerDecoratorDashboar
               ),
               title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(item.description),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Rs ${item.price.toStringAsFixed(0)}",
-                    style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () async {
-                          final updated = await Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DecoratorServiceFormScreen(existing: item),
-                            ),
-                          );
-                          if (updated == true) _loadServices();
-                        },
+              trailing: SizedBox(
+                width: 120,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      "Rs ${item.price.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => _deleteService(item.id),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+                          onPressed: () async {
+                            final updated = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DecoratorServiceFormScreen(existing: item),
+                              ),
+                            );
+                            if (updated == true) _loadServices();
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+                          onPressed: () => _deleteService(item.id),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -251,3 +266,5 @@ class _OrganizerDecoratorDashboardState extends State<OrganizerDecoratorDashboar
     );
   }
 }
+
+

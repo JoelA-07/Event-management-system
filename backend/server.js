@@ -18,7 +18,8 @@ const VendorAvailability = require('./src/models/VendorAvailability');
 const User = require('./src/models/User');
 const Review = require('./src/models/Review');
 const path = require('path');
-const aiRoutes = require('./src/routes/aiRoutes');\nconst notificationRoutes = require('./src/routes/notificationRoutes');
+const aiRoutes = require('./src/routes/aiRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
 
 const app = express();
 
@@ -47,7 +48,8 @@ app.use('/api/vendor-bookings', vendorBookingRoutes);
 app.use('/api/organizer', organizerRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/ai', aiRoutes);\napp.use('/api/notifications', notificationRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Test route
 app.get('/', (req, res) => {

@@ -216,7 +216,24 @@ exports.firebaseLogin = async (req, res) => {
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {
-    res.status(500).json({ message: 'Firebase login failed', error: error.message });
+    const message = error?.message || 'Unknown error';
+
+    if (message.includes('Firebase Admin not configured')) {
+      return res.status(500).json({
+        message: 'Firebase Admin not configured',
+        error: message,
+        hint: 'Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH in backend/.env',
+      });
+    }
+
+    if (message.toLowerCase().includes('id token') || message.toLowerCase().includes('token')) {
+      return res.status(401).json({
+        message: 'Invalid Firebase ID token',
+        error: message,
+      });
+    }
+
+    res.status(500).json({ message: 'Firebase login failed', error: message });
   }
 };
 
