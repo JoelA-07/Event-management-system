@@ -14,18 +14,28 @@ function chunk(array, size) {
 
 exports.sendNotification = async (req, res) => {
   try {
-    const { userId, title, body, data } = req.body;
+    const { userId, email, title, body, data } = req.body;
     const targetUserId = userId || req.user?.id;
 
-    if (!targetUserId) {
+    let resolvedUserId = targetUserId;
+    if (!resolvedUserId && email) {
+      const userByEmail = await User.findOne({ where: { email } });
+      if (!userByEmail) {
+        return res.status(404).json({ message: 'User not found for email' });
+      }
+      resolvedUserId = userByEmail.id;
+    }
+
+    if (!resolvedUserId) {
       return res.status(400).json({ message: 'Missing target user' });
     }
 
-    if (req.user?.id && String(targetUserId) !== String(req.user.id)) {
+    const isOrganizer = req.user?.role === 'organizer';
+    if (req.user?.id && String(resolvedUserId) !== String(req.user.id) && !isOrganizer) {
       return res.status(403).json({ message: 'Cannot send notifications to other users' });
     }
 
-    const user = await User.findByPk(targetUserId);
+    const user = await User.findByPk(resolvedUserId);
     if (!user || !user.fcmToken) {
       return res.status(404).json({ message: 'FCM token not found for user' });
     }

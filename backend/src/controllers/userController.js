@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { Op } = require('sequelize');
 const User = require('../models/User');
 const UserSettings = require('../models/UserSettings');
 
@@ -127,5 +128,30 @@ exports.updateSettings = async (req, res) => {
     return res.json(settings);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to update settings' });
+  }
+};
+
+exports.searchUsers = async (req, res) => {
+  try {
+    const query = (req.query.query || '').trim();
+    if (!query) {
+      return res.json([]);
+    }
+
+    const users = await User.findAll({
+      where: {
+        [Op.or]: [
+          { email: { [Op.like]: `%${query}%` } },
+          { name: { [Op.like]: `%${query}%` } },
+        ],
+      },
+      attributes: ['id', 'name', 'email', 'role'],
+      limit: 10,
+      order: [['id', 'DESC']],
+    });
+
+    return res.json(users);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to search users' });
   }
 };
