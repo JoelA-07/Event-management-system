@@ -160,11 +160,14 @@ class _OrganizerNotificationsScreenState extends State<OrganizerNotificationsScr
                 ),
               ),
               const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: _isSearching ? null : _searchUsers,
-                child: _isSearching
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Search'),
+              SizedBox(
+                width: 120,
+                child: ElevatedButton(
+                  onPressed: _isSearching ? null : _searchUsers,
+                  child: _isSearching
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Search'),
+                ),
               ),
             ],
           ),
@@ -190,7 +193,7 @@ class _OrganizerNotificationsScreenState extends State<OrganizerNotificationsScr
 
   Widget _buildDropdown() {
     return DropdownButtonFormField<String>(
-      value: _selectedEmail,
+      initialValue: _selectedEmail,
       decoration: const InputDecoration(labelText: 'Select user'),
       items: _searchResults.map((user) {
         final email = (user['email'] ?? '').toString();

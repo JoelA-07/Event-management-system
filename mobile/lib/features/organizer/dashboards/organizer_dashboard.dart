@@ -5,7 +5,6 @@ import 'package:mobile/features/organizer/screens/organizer_package_builder.dart
 import 'package:mobile/features/halls/screens/hall_list_screen.dart';
 import 'package:mobile/features/organizer/dashboards/organizer_decorator_dashboard.dart';
 import 'package:mobile/features/organizer/screens/organizer_notifications_screen.dart';
-import 'package:mobile/features/payments/screens/payment_summary_screen.dart';
 import 'package:mobile/features/organizer/services/organizer_service.dart';
 
 class OrganizerDashboard extends StatelessWidget {

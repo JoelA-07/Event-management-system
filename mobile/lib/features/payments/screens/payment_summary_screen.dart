@@ -90,7 +90,7 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: paymentType,
+                initialValue: paymentType,
                 decoration: const InputDecoration(labelText: 'Type'),
                 items: const [
                   DropdownMenuItem(value: 'advance', child: Text('Advance')),
@@ -325,7 +325,7 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
     final total = _num(payment['totalAmount']);
     final paid = _num(payment['paidAmount']);
     final advance = _num(payment['advanceAmount']);
-    final remaining = (total - paid).clamp(0, total);
+    final remaining = (total - paid).clamp(0, total).toDouble();
 
     final isOrganizer = _role == 'organizer';
     final isCustomer = _role == 'customer';
@@ -438,11 +438,11 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               title: Text('${t['type']} - Rs ${t['amount']}'),
-              subtitle: Text('${t['method']} • ${t['status']}'),
+              subtitle: Text('${t['method']}  ${t['status']}'),
               trailing: Text(t['paidAt']?.toString() ?? ''),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -464,7 +464,7 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
               trailing: Text(p['paidAt']?.toString() ?? ''),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }

@@ -64,6 +64,10 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       home: const AuthGate(),
+      builder: (context, child) => FocusTraversalGroup(
+        policy: WidgetOrderTraversalPolicy(),
+        child: child ?? const SizedBox.shrink(),
+      ),
       routes: {
         '/login': (context) => const LoginScreen(),
       },
