@@ -137,4 +137,25 @@ class VendorBookingService {
     }
   }
 
+  Future<Response?> cancelVendorBooking({
+    required int bookingId,
+    String? reason,
+    double? refundAmount,
+    String? refundMethod,
+    bool? autoRefund,
+  }) async {
+    try {
+      return await _dio.post(
+        "${AppConstants.baseUrl}/vendor-bookings/$bookingId/cancel",
+        data: {
+          if (reason != null) "reason": reason,
+          if (refundAmount != null) "refundAmount": refundAmount,
+          if (refundMethod != null) "refundMethod": refundMethod,
+          if (autoRefund != null) "autoRefund": autoRefund,
+        },
+      );
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
 }

@@ -14,18 +14,29 @@ const EVENT_KEYWORDS = {
 // 1. Add a new Hall
 exports.addHall = async (req, res) => {
   try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
     const { name, location, capacity, pricePerDay, description, ownerId } = req.body;
-    
-    // Get the filename from multer
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : "/uploads/default.jpg";
 
-    const hall = await Hall.create({ 
-      name, location, capacity, pricePerDay, description, ownerId, 
-      imageUrl: imageUrl // Save path to DB
+    const isOrganizer = req.user.role === 'organizer';
+
+    // Get the filename from multer
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : '/uploads/default.jpg';
+
+    const hall = await Hall.create({
+      name,
+      location,
+      capacity,
+      pricePerDay,
+      description,
+      ownerId,
+      imageUrl: imageUrl, // Save path to DB
+      approvalStatus: isOrganizer ? 'approved' : 'pending',
+      approvedBy: isOrganizer ? req.user.id : null,
+      approvedAt: isOrganizer ? new Date() : null,
     });
     res.status(201).json(hall);
   } catch (error) {
-    res.status(500).json({ message: "Error adding hall", error: error.message });
+    res.status(500).json({ message: 'Error adding hall', error: error.message });
   }
 };
 
@@ -33,18 +44,25 @@ exports.addHall = async (req, res) => {
 exports.getAllHalls = async (req, res) => {
   try {
     const eventType = String(req.query.eventType || '').toLowerCase().trim();
-    let where = undefined;
+    const isOrganizer = req.user?.role === 'organizer';
+
+    const filters = [];
+    if (!isOrganizer) {
+      filters.push({ approvalStatus: 'approved' });
+    }
 
     if (eventType) {
       const keywords = EVENT_KEYWORDS[eventType] || [eventType];
-      where = {
+      filters.push({
         [Op.or]: keywords.flatMap((word) => [
           { name: { [Op.like]: `%${word}%` } },
           { description: { [Op.like]: `%${word}%` } },
           { location: { [Op.like]: `%${word}%` } },
         ]),
-      };
+      });
     }
+
+    const where = filters.length ? { [Op.and]: filters } : undefined;
 
     const halls = await Hall.findAll({ where, order: [['id', 'DESC']] });
     res.json(halls);

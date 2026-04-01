@@ -6,6 +6,8 @@ const {
   createPaymentLink,
   markCashPayment,
   recordPayout,
+  refundPayment,
+  downloadReceipt,
   razorpayWebhook,
 } = require('../controllers/paymentController');
 
@@ -16,6 +18,8 @@ router.patch('/plan/:paymentId', verifyToken, requireRole('organizer'), setPayme
 router.post('/link', verifyToken, createPaymentLink);
 router.post('/mark-cash', verifyToken, requireRole('organizer'), markCashPayment);
 router.post('/payouts', verifyToken, requireRole('organizer'), recordPayout);
+router.post('/refund', verifyToken, requireRole('organizer'), refundPayment);
+router.get('/receipt/:paymentId', verifyToken, downloadReceipt);
 
 router.post(
   '/razorpay/webhook',

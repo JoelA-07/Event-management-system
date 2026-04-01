@@ -1,9 +1,11 @@
 const Booking = require('../models/Booking');
 const Hall = require('../models/Hall');
 const BookingLock = require('../models/BookingLock');
+const Payment = require('../models/Payment');
 const sequelize = require('../config/db');
 const { withTransactionRetry } = require('../utils/withTransactionRetry');
 const { notifyUser, notifyOrganizers } = require('../services/notificationService');
+const { recordRefund, toNumber } = require('../services/paymentService');
 const { Op } = require('sequelize');
 
 const SLOT_PRESETS = {
@@ -138,6 +140,73 @@ exports.createBooking = async (req, res) => {
     const statusCode = error.statusCode || 500;
     const message = statusCode === 500 ? "Server error" : error.message;
     res.status(statusCode).json({ message, error: statusCode === 500 ? error.message : undefined });
+  }
+};
+
+exports.cancelBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, refundAmount, refundMethod, autoRefund } = req.body || {};
+
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const booking = await Booking.findByPk(id);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    let allowed = false;
+    if (req.user.role === 'organizer') {
+      allowed = true;
+    } else if (req.user.role === 'customer') {
+      allowed = Number(req.user.id) === Number(booking.customerId);
+    } else if (req.user.role === 'hall_owner') {
+      const hall = await Hall.findByPk(booking.hallId);
+      allowed = hall && Number(hall.ownerId) === Number(req.user.id);
+    }
+
+    if (!allowed) return res.status(403).json({ message: 'Access denied' });
+    if (booking.status === 'cancelled') return res.json({ message: 'Already cancelled', booking });
+
+    booking.status = 'cancelled';
+    booking.cancelledAt = new Date();
+    booking.cancelledBy = req.user.id;
+    booking.cancelReason = reason || null;
+    await booking.save();
+
+    let refundResult = null;
+    if (req.user.role === 'organizer') {
+      const payment = await Payment.findOne({ where: { bookingType: 'hall', bookingId: booking.id } });
+      if (payment) {
+        const refundable = Math.max(toNumber(payment.paidAmount) - toNumber(payment.refundedAmount), 0);
+        const shouldRefund = autoRefund || (refundAmount != null && toNumber(refundAmount) > 0);
+        if (shouldRefund && refundable > 0) {
+          const amount = autoRefund ? refundable : refundAmount;
+          refundResult = await recordRefund({
+            paymentId: payment.id,
+            amount,
+            method: refundMethod || 'manual',
+            createdBy: req.user.id,
+            notes: reason,
+          });
+        }
+      }
+    }
+
+    try {
+      await notifyUser(booking.customerId, 'bookingAlerts', {
+        title: 'Booking cancelled',
+        body: `Your booking for ${booking.bookingDate} was cancelled.`,
+        data: { type: 'booking_cancelled', bookingId: booking.id, hallId: booking.hallId, bookingDate: booking.bookingDate },
+      });
+      await notifyOrganizers({
+        title: 'Booking cancelled',
+        body: `Hall booking ${booking.id} was cancelled.`,
+        data: { type: 'booking_cancelled', bookingId: booking.id },
+      });
+    } catch (_) {}
+
+    return res.json({ message: 'Booking cancelled', booking, refund: refundResult });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({ message: 'Failed to cancel booking', error: error.message });
   }
 };
 

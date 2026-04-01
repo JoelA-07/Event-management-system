@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme.dart';
 import 'package:mobile/core/widgets/dashboard_header.dart';
+import 'package:mobile/features/organizer/screens/organizer_admin_dashboard.dart';
 import 'package:mobile/features/organizer/screens/organizer_package_builder.dart';
 import 'package:mobile/features/halls/screens/hall_list_screen.dart';
 import 'package:mobile/features/organizer/dashboards/organizer_decorator_dashboard.dart';
@@ -49,6 +50,7 @@ class OrganizerDashboard extends StatelessWidget {
                       const SizedBox(height: 25),
                       const Text("Quick Actions", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
+                      _buildTile(context, "Admin Console", "Approvals, payouts, disputes", Icons.admin_panel_settings, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerAdminDashboard()))),
                       _buildTile(context, "Build Package", "Combo Hall + Photo + Food", Icons.auto_awesome_motion, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PackageBuilderScreen()))),
                       _buildTile(context, "Manage Halls", "Add or Edit venues", Icons.business, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HallListScreen()))),
                       _buildTile(context, "Decorator Studio", "Manage decoration packages", Icons.brush, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerDecoratorDashboard()))),

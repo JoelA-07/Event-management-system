@@ -66,6 +66,41 @@ class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
     }
   }
 
+  Future<void> _showCancelDialog(int bookingId) async {
+    final reasonController = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel booking'),
+        content: TextField(
+          controller: reasonController,
+          decoration: const InputDecoration(labelText: 'Reason (optional)'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final res = await _service.cancelVendorBooking(
+                bookingId: bookingId,
+                reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+              );
+              if (!mounted) return;
+              if (res?.statusCode == 200) {
+                _loadBookings();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(res?.data['message'] ?? 'Cancel failed')),
+                );
+              }
+            },
+            child: const Text('Confirm cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,7 +174,7 @@ class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
                                   children: [
                                     Expanded(
                                       child: OutlinedButton.icon(
-                                        onPressed: () => _updateStatus(int.parse(booking['id'].toString()), 'cancelled'),
+                                        onPressed: () => _showCancelDialog(int.parse(booking['id'].toString())),
                                         icon: const Icon(Icons.close, color: Colors.red),
                                         label: const Text("Reject"),
                                       ),
@@ -161,7 +196,7 @@ class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
                                   children: [
                                     Expanded(
                                       child: OutlinedButton.icon(
-                                        onPressed: () => _updateStatus(int.parse(booking['id'].toString()), 'cancelled'),
+                                        onPressed: () => _showCancelDialog(int.parse(booking['id'].toString())),
                                         icon: const Icon(Icons.close, color: Colors.red),
                                         label: const Text("Cancel"),
                                       ),

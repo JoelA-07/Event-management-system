@@ -8,11 +8,20 @@ const Review = sequelize.define('Review', {
   serviceId: { type: DataTypes.INTEGER, allowNull: true },
   rating: { type: DataTypes.INTEGER, allowNull: false }, // 1-5
   comment: { type: DataTypes.TEXT, allowNull: true },
+  status: {
+    type: DataTypes.ENUM('approved', 'pending', 'rejected'),
+    allowNull: false,
+    defaultValue: 'approved',
+  },
+  reportCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+  moderatedBy: { type: DataTypes.INTEGER, allowNull: true },
+  moderatedAt: { type: DataTypes.DATE, allowNull: true },
 }, {
   indexes: [
     { fields: ['hallId'] },
     { fields: ['serviceId'] },
     { fields: ['userId'] },
+    { fields: ['status'] },
   ],
 });
 

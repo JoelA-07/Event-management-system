@@ -4,99 +4,218 @@ import 'package:mobile/features/bookings/services/booking_service.dart';
 import 'package:mobile/core/theme.dart';
 import 'package:mobile/features/payments/screens/payment_summary_screen.dart';
 
-class MyBookingsScreen extends StatelessWidget {
+class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
 
-  Future<List<dynamic>> _loadBookings() async {
+  @override
+  State<MyBookingsScreen> createState() => _MyBookingsScreenState();
+}
+
+class _MyBookingsScreenState extends State<MyBookingsScreen> {
+  final BookingService _service = BookingService();
+  List<dynamic> _bookings = [];
+  String _role = '';
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBookings();
+  }
+
+  Future<void> _loadBookings() async {
     const storage = FlutterSecureStorage();
     final id = await storage.read(key: "userId");
     final role = await storage.read(key: "role");
-    if (id == null || role == null) return [];
-    return BookingService().fetchUserBookings(int.parse(id), role);
+    if (id == null || role == null) {
+      setState(() {
+        _loading = false;
+        _bookings = [];
+      });
+      return;
+    }
+    final data = await _service.fetchUserBookings(int.parse(id), role);
+    if (!mounted) return;
+    setState(() {
+      _role = role;
+      _bookings = data;
+      _loading = false;
+    });
+  }
+
+  Future<void> _showCancelDialog(dynamic booking) async {
+    final reasonController = TextEditingController();
+    final refundController = TextEditingController();
+    bool autoRefund = true;
+    String refundMethod = 'manual';
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Cancel booking'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(labelText: 'Reason (optional)'),
+                ),
+                if (_role == 'organizer') ...[
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    value: autoRefund,
+                    onChanged: (val) => setLocal(() => autoRefund = val),
+                    title: const Text('Auto refund paid amount'),
+                  ),
+                  if (!autoRefund) ...[
+                    TextField(
+                      controller: refundController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Refund amount (optional)'),
+                    ),
+                    DropdownButtonFormField<String>(
+                      value: refundMethod,
+                      items: const [
+                        DropdownMenuItem(value: 'manual', child: Text('Manual')),
+                        DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                        DropdownMenuItem(value: 'online', child: Text('Online')),
+                      ],
+                      onChanged: (val) => setLocal(() => refundMethod = val ?? 'manual'),
+                      decoration: const InputDecoration(labelText: 'Refund method'),
+                    ),
+                  ]
+                ]
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final refundAmount = refundController.text.trim().isEmpty
+                    ? null
+                    : double.tryParse(refundController.text.trim());
+                final res = await _service.cancelBooking(
+                  bookingId: int.parse(booking['id'].toString()),
+                  reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+                  refundAmount: refundAmount,
+                  refundMethod: refundMethod,
+                  autoRefund: _role == 'organizer' ? autoRefund : null,
+                );
+                if (!mounted) return;
+                if (res?.statusCode == 200) {
+                  _loadBookings();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(res?.data['message'] ?? 'Cancel failed')),
+                  );
+                }
+              },
+              child: const Text('Confirm cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    if (status == 'confirmed') return Colors.green;
+    if (status == 'cancelled') return Colors.red;
+    return Colors.orange;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("My Event History", style: TextStyle(fontWeight: FontWeight.bold))),
-      body: FutureBuilder<List<dynamic>>(
-        future: _loadBookings(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.event_busy, size: 80, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text("No bookings found yet.", style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            );
-          }
-
-          final bookings = snapshot.data!;
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: bookings.length,
-            itemBuilder: (context, index) {
-              final booking = bookings[index];
-              final hall = booking['Hall'];
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 14),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(15),
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.celebration, color: AppTheme.primaryColor),
-                  ),
-                  title: Text(hall['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _bookings.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 5),
-                      Text("Date: ${booking['bookingDate']}"),
-                      Text(
-                        "Status: ${booking['status'].toUpperCase()}",
-                        style: TextStyle(
-                          color: booking['status'] == 'confirmed' ? Colors.green : Colors.orange,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      TextButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PaymentSummaryScreen(
-                              bookingType: 'hall',
-                              bookingId: int.parse(booking['id'].toString()),
-                            ),
-                          ),
-                        ),
-                        icon: const Icon(Icons.payments_outlined, size: 18),
-                        label: const Text('Payments'),
-                      ),
+                      Icon(Icons.event_busy, size: 80, color: Colors.grey),
+                      SizedBox(height: 10),
+                      Text("No bookings found yet.", style: TextStyle(color: Colors.grey)),
                     ],
                   ),
-                  trailing: Text(
-                    "Rs ${hall['pricePerDay']}",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryColor),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadBookings,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _bookings.length,
+                    itemBuilder: (context, index) {
+                      final booking = _bookings[index];
+                      final hall = booking['Hall'];
+                      final status = booking['status']?.toString() ?? 'confirmed';
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(15),
+                          leading: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.celebration, color: AppTheme.primaryColor),
+                          ),
+                          title: Text(hall['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 5),
+                              Text("Date: ${booking['bookingDate']}"),
+                              Text(
+                                "Status: ${status.toUpperCase()}",
+                                style: TextStyle(
+                                  color: _statusColor(status),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => PaymentSummaryScreen(
+                                          bookingType: 'hall',
+                                          bookingId: int.parse(booking['id'].toString()),
+                                        ),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.payments_outlined, size: 18),
+                                    label: const Text('Payments'),
+                                  ),
+                                  if (status != 'cancelled')
+                                    TextButton.icon(
+                                      onPressed: () => _showCancelDialog(booking),
+                                      icon: const Icon(Icons.cancel_outlined, size: 18, color: Colors.red),
+                                      label: const Text('Cancel'),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          trailing: Text(
+                            "Rs ${hall['pricePerDay']}",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryColor),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-              );
-            },
-          );
-        },
-      ),
     );
   }
 }

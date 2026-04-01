@@ -33,7 +33,14 @@ exports.addService = async (req, res) => {
     if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(req.body.vendorId)) {
       return res.status(403).json({ message: 'Cannot add service for another vendor' });
     }
-    const service = await VendorService.create(req.body);
+
+    const isOrganizer = req.user.role === 'organizer';
+    const service = await VendorService.create({
+      ...req.body,
+      approvalStatus: isOrganizer ? 'approved' : 'pending',
+      approvedBy: isOrganizer ? req.user.id : null,
+      approvedAt: isOrganizer ? new Date() : null,
+    });
     res.status(201).json(service);
   } catch (error) {
     res.status(500).json({ message: 'Error adding service', error: error.message });
@@ -47,8 +54,15 @@ exports.addServiceWithImage = async (req, res) => {
       return res.status(403).json({ message: 'Cannot add service for another vendor' });
     }
 
+    const isOrganizer = req.user.role === 'organizer';
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl;
-    const payload = { ...req.body, imageUrl };
+    const payload = {
+      ...req.body,
+      imageUrl,
+      approvalStatus: isOrganizer ? 'approved' : 'pending',
+      approvedBy: isOrganizer ? req.user.id : null,
+      approvedAt: isOrganizer ? new Date() : null,
+    };
     const service = await VendorService.create(payload);
     res.status(201).json(service);
   } catch (error) {
@@ -165,9 +179,11 @@ exports.addMenuWithImage = async (req, res) => {
   }
 };
 
-exports.getAllVendorServices = async (_req, res) => {
+exports.getAllVendorServices = async (req, res) => {
   try {
-    const services = await VendorService.findAll({ order: [['id', 'DESC']] });
+    const isOrganizer = req.user?.role === 'organizer';
+    const where = isOrganizer ? undefined : { approvalStatus: 'approved' };
+    const services = await VendorService.findAll({ where, order: [['id', 'DESC']] });
     res.json(services);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching all services', error: error.message });
@@ -177,8 +193,13 @@ exports.getAllVendorServices = async (_req, res) => {
 exports.getServicesByCategory = async (req, res) => {
   try {
     const { category } = req.params;
+    const isOrganizer = req.user?.role === 'organizer';
+    const where = {
+      category,
+      ...(isOrganizer ? {} : { approvalStatus: 'approved' }),
+    };
     const services = await VendorService.findAll({
-      where: { category },
+      where,
       order: [['id', 'DESC']],
     });
     res.json(services);

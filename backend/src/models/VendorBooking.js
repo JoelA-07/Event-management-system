@@ -18,6 +18,9 @@ const VendorBooking = sequelize.define(
     endTime: { type: DataTypes.TIME, allowNull: true },
     notes: { type: DataTypes.TEXT },
     status: { type: DataTypes.STRING, defaultValue: 'pending' }, // pending, confirmed, completed, cancelled
+    cancelledAt: { type: DataTypes.DATE, allowNull: true },
+    cancelledBy: { type: DataTypes.INTEGER, allowNull: true },
+    cancelReason: { type: DataTypes.STRING, allowNull: true },
   },
   {
     indexes: [

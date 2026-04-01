@@ -33,7 +33,15 @@ const Hall = sequelize.define('Hall', {
   ownerId: {
     type: DataTypes.INTEGER,
     allowNull: false,
-  }
+  },
+  approvalStatus: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    allowNull: false,
+    defaultValue: 'pending',
+  },
+  approvedBy: { type: DataTypes.INTEGER, allowNull: true },
+  approvedAt: { type: DataTypes.DATE, allowNull: true },
+  rejectionReason: { type: DataTypes.STRING, allowNull: true },
 });
 
 module.exports = Hall;

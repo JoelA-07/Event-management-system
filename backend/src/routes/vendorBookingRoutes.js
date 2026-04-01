@@ -3,6 +3,7 @@ const router = express.Router();
 const { verifyToken, requireRole } = require('../middleware/auth');
 const {
   createVendorBooking,
+  cancelVendorBooking,
   getVendorBookings,
   getCustomerVendorBookings,
   getVendorBookedSlots,
@@ -15,6 +16,7 @@ const {
 router.use(verifyToken);
 
 router.post('/create', requireRole(['customer', 'organizer']), createVendorBooking);
+router.post('/:id/cancel', requireRole(['customer', 'organizer', 'decorator', 'photographer', 'caterer', 'designer', 'mehendi']), cancelVendorBooking);
 router.get('/vendor/:vendorId', requireRole(['organizer', 'decorator', 'photographer', 'caterer', 'designer', 'mehendi', 'hall_owner']), getVendorBookings);
 router.get('/customer/:customerId', requireRole(['customer', 'organizer']), getCustomerVendorBookings);
 router.patch('/:id/status', requireRole(['organizer', 'decorator', 'photographer', 'caterer', 'designer', 'mehendi']), updateVendorBookingStatus);

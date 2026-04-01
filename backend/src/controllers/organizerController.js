@@ -3,7 +3,8 @@ const VendorBooking = require('../models/VendorBooking');
 const VendorService = require('../models/VendorService');
 const Hall = require('../models/Hall');
 const User = require('../models/User');
-const sequelize = require('../config/db');
+const Payment = require('../models/Payment');
+const Payout = require('../models/Payout');
 const { Op, fn, col, literal } = require('sequelize');
 
 exports.getOrganizerOverview = async (req, res) => {
@@ -117,5 +118,79 @@ exports.getOrganizerAnalytics = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error loading analytics', error: error.message });
+  }
+};
+
+exports.listPendingApprovals = async (req, res) => {
+  try {
+    const halls = await Hall.findAll({ where: { approvalStatus: 'pending' }, order: [['id', 'DESC']] });
+    const services = await VendorService.findAll({ where: { approvalStatus: 'pending' }, order: [['id', 'DESC']] });
+    res.json({ halls, services });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to load approvals', error: error.message });
+  }
+};
+
+exports.approveHall = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body || {};
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    const hall = await Hall.findByPk(id);
+    if (!hall) return res.status(404).json({ message: 'Hall not found' });
+
+    hall.approvalStatus = status;
+    hall.approvedBy = req.user?.id;
+    hall.approvedAt = new Date();
+    hall.rejectionReason = status === 'rejected' ? (reason || 'Not specified') : null;
+    await hall.save();
+
+    res.json({ message: 'Hall updated', hall });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update hall', error: error.message });
+  }
+};
+
+exports.approveVendorService = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body || {};
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    const service = await VendorService.findByPk(id);
+    if (!service) return res.status(404).json({ message: 'Service not found' });
+
+    service.approvalStatus = status;
+    service.approvedBy = req.user?.id;
+    service.approvedAt = new Date();
+    service.rejectionReason = status === 'rejected' ? (reason || 'Not specified') : null;
+    await service.save();
+
+    res.json({ message: 'Service updated', service });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update service', error: error.message });
+  }
+};
+
+exports.getPayoutDashboard = async (req, res) => {
+  try {
+    const payments = await Payment.findAll({ order: [['id', 'DESC']], limit: 200 });
+    const payouts = await Payout.findAll({ order: [['id', 'DESC']], limit: 200 });
+    res.json({ payments, payouts });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to load payouts', error: error.message });
+  }
+};
+
+exports.getBookingDashboard = async (req, res) => {
+  try {
+    const hallBookings = await Booking.findAll({ order: [['id', 'DESC']], limit: 200 });
+    const vendorBookings = await VendorBooking.findAll({ order: [['id', 'DESC']], limit: 200 });
+    res.json({ hallBookings, vendorBookings });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to load bookings', error: error.message });
   }
 };

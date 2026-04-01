@@ -20,15 +20,22 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
 
   List<VendorModel> _services = [];
   VendorModel? _selectedService;
-  DateTime? _selectedDate;
+  DateTime _selectedDate = DateTime.now();
+  DateTime _weekStart = _startOfWeek(DateTime.now());
   bool _loading = true;
   List<dynamic> _blocked = [];
+  List<dynamic> _booked = [];
 
   String _slotType = 'full_day';
   String _slotLabel = 'morning';
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   final _reasonController = TextEditingController();
+
+  static DateTime _startOfWeek(DateTime date) {
+    final normalized = DateTime(date.year, date.month, date.day);
+    return normalized.subtract(Duration(days: normalized.weekday - 1));
+  }
 
   @override
   void initState() {
@@ -49,33 +56,45 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
       _selectedService = services.isNotEmpty ? services.first : null;
       _loading = false;
     });
+    _loadSlots();
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-      _loadBlocked();
-    }
-  }
-
-  Future<void> _loadBlocked() async {
-    if (_selectedService == null || _selectedDate == null) return;
+  Future<void> _loadSlots() async {
+    if (_selectedService == null) return;
     final vendorId = await _storage.read(key: "userId");
     if (vendorId == null) return;
-    final date = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+    final date = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final blocked = await _bookingService.fetchVendorUnavailableSlots(
       vendorId: int.parse(vendorId),
       serviceId: _selectedService!.id,
       date: date,
     );
+    final booked = await _bookingService.fetchVendorBookedSlots(
+      vendorId: int.parse(vendorId),
+      serviceId: _selectedService!.id,
+      date: date,
+    );
     if (!mounted) return;
-    setState(() => _blocked = blocked);
+    setState(() {
+      _blocked = blocked;
+      _booked = booked;
+    });
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _weekStart = _startOfWeek(picked);
+      });
+      _loadSlots();
+    }
   }
 
   String _formatTime(TimeOfDay time) {
@@ -85,7 +104,7 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
   }
 
   Future<void> _blockSlot() async {
-    if (_selectedService == null || _selectedDate == null) return;
+    if (_selectedService == null) return;
     final vendorId = await _storage.read(key: "userId");
     if (vendorId == null) return;
 
@@ -108,7 +127,7 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
     final res = await _bookingService.blockVendorSlot(
       vendorId: int.parse(vendorId),
       serviceId: _selectedService!.id,
-      date: DateFormat('yyyy-MM-dd').format(_selectedDate!),
+      date: DateFormat('yyyy-MM-dd').format(_selectedDate),
       slotType: _slotType,
       startTime: startTime,
       endTime: endTime,
@@ -118,7 +137,9 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
     if (!mounted) return;
     if (res?.statusCode == 201) {
       _reasonController.clear();
-      _loadBlocked();
+      _startTime = null;
+      _endTime = null;
+      _loadSlots();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(res?.data['message'] ?? "Failed to block slot")),
@@ -130,7 +151,7 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
     final res = await _bookingService.unblockVendorSlot(id);
     if (!mounted) return;
     if (res?.statusCode == 200) {
-      _loadBlocked();
+      _loadSlots();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(res?.data['message'] ?? "Failed to unblock slot")),
@@ -156,23 +177,14 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
                         .toList(),
                     onChanged: (val) {
                       setState(() => _selectedService = val);
-                      _loadBlocked();
+                      _loadSlots();
                     },
                     decoration: const InputDecoration(labelText: "Select Service"),
                   ),
                   const SizedBox(height: 12),
-                  ListTile(
-                    tileColor: Colors.grey[100],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    leading: const Icon(Icons.calendar_today, color: AppTheme.primaryColor),
-                    title: Text(
-                      _selectedDate == null
-                          ? "Choose a date"
-                          : DateFormat('dd MMM yyyy').format(_selectedDate!),
-                    ),
-                    trailing: const Icon(Icons.edit, size: 16),
-                    onTap: _pickDate,
-                  ),
+                  _buildCalendarHeader(),
+                  const SizedBox(height: 10),
+                  _buildWeekStrip(),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -248,36 +260,150 @@ class _VendorAvailabilityScreenState extends State<VendorAvailabilityScreen> {
                     child: const Text("Block Slot"),
                   ),
                   const SizedBox(height: 16),
-                  const Text("Blocked Slots", style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
                   Expanded(
-                    child: _blocked.isEmpty
-                        ? const Text("No blocked slots")
-                        : ListView.builder(
-                            itemCount: _blocked.length,
-                            itemBuilder: (context, index) {
-                              final slot = _blocked[index];
-                              final type = slot['slotType']?.toString() ?? 'slot';
-                              final start = slot['startTime']?.toString() ?? '';
-                              final end = slot['endTime']?.toString() ?? '';
-                              final label = type == 'full_day' ? 'Full Day' : "$type $start-$end";
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                child: ListTile(
-                                  title: Text(label),
-                                  subtitle: Text(slot['reason'] ?? ''),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                    onPressed: () => _unblockSlot(slot['id'] as int),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                    child: ListView(
+                      children: [
+                        _sectionHeader('Booked Slots', _booked.length),
+                        if (_booked.isEmpty)
+                          const Text("No bookings for this date", style: TextStyle(color: Colors.grey)),
+                        ..._booked.map(_bookedCard),
+                        const SizedBox(height: 16),
+                        _sectionHeader('Blocked Slots', _blocked.length),
+                        if (_blocked.isEmpty)
+                          const Text("No blocked slots", style: TextStyle(color: Colors.grey)),
+                        ..._blocked.map(_blockedCard),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildCalendarHeader() {
+    final monthLabel = DateFormat('MMMM yyyy').format(_selectedDate);
+    return Row(
+      children: [
+        Expanded(
+          child: Text(monthLabel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        IconButton(
+          onPressed: () {
+            setState(() {
+              _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+              _weekStart = _weekStart.subtract(const Duration(days: 7));
+            });
+            _loadSlots();
+          },
+          icon: const Icon(Icons.chevron_left),
+        ),
+        IconButton(
+          onPressed: () {
+            setState(() {
+              _selectedDate = _selectedDate.add(const Duration(days: 7));
+              _weekStart = _weekStart.add(const Duration(days: 7));
+            });
+            _loadSlots();
+          },
+          icon: const Icon(Icons.chevron_right),
+        ),
+        TextButton.icon(
+          onPressed: _pickDate,
+          icon: const Icon(Icons.calendar_today, size: 16),
+          label: const Text('Pick'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeekStrip() {
+    final days = List.generate(7, (i) => _weekStart.add(Duration(days: i)));
+    return Row(
+      children: days.map((date) {
+        final isSelected = date.year == _selectedDate.year &&
+            date.month == _selectedDate.month &&
+            date.day == _selectedDate.day;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() => _selectedDate = date);
+              _loadSlots();
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? AppTheme.primaryColor : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+                boxShadow: [
+                  if (isSelected)
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Text(DateFormat('E').format(date),
+                      style: TextStyle(color: isSelected ? Colors.white : Colors.black54, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text('${date.day}',
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold,
+                      )),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _sectionHeader(String title, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('$count', style: const TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _bookedCard(dynamic slot) {
+    final type = slot['slotType']?.toString() ?? 'slot';
+    final start = slot['startTime']?.toString() ?? '';
+    final end = slot['endTime']?.toString() ?? '';
+    final label = type == 'full_day' ? 'Full Day' : "$type $start-$end";
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: const Icon(Icons.event_busy, color: Colors.orange),
+        title: Text(label),
+        subtitle: Text('Status: ${slot['status'] ?? 'confirmed'}'),
+      ),
+    );
+  }
+
+  Widget _blockedCard(dynamic slot) {
+    final type = slot['slotType']?.toString() ?? 'slot';
+    final start = slot['startTime']?.toString() ?? '';
+    final end = slot['endTime']?.toString() ?? '';
+    final label = type == 'full_day' ? 'Full Day' : "$type $start-$end";
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        title: Text(label),
+        subtitle: Text(slot['reason'] ?? ''),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline, color: Colors.red),
+          onPressed: () => _unblockSlot(slot['id'] as int),
+        ),
+      ),
     );
   }
 

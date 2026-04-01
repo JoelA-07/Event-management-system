@@ -8,17 +8,8 @@ const PaymentTransaction = require('../models/PaymentTransaction');
 const Payout = require('../models/Payout');
 const { getRazorpayClient, verifyWebhookSignature } = require('../services/razorpayService');
 const { notifyUser, notifyOrganizers } = require('../services/notificationService');
-
-function toNumber(value) {
-  const num = Number(value || 0);
-  return Number.isNaN(num) ? 0 : num;
-}
-
-function computeStatus(total, paid) {
-  if (paid >= total && total > 0) return 'paid';
-  if (paid > 0) return 'partial';
-  return 'pending';
-}
+const { toNumber, computeStatus, recordRefund } = require('../services/paymentService');
+const PDFDocument = require('pdfkit');
 
 async function ensureReceipt(payment) {
   if (payment.receiptNumber) return;
@@ -132,13 +123,15 @@ exports.createPaymentLink = async (req, res) => {
     const total = toNumber(payment.totalAmount);
     const advance = toNumber(payment.advanceAmount);
     const paid = toNumber(payment.paidAmount);
-    const remaining = Math.max(total - paid, 0);
+    const refunded = toNumber(payment.refundedAmount);
+    const netPaid = Math.max(paid - refunded, 0);
+    const remaining = Math.max(total - netPaid, 0);
 
     let amountToCharge = 0;
     if (type === 'advance') {
       if (advance <= 0) return res.status(400).json({ message: 'Advance is not set' });
-      if (paid >= advance) return res.status(400).json({ message: 'Advance already paid' });
-      amountToCharge = Math.min(advance - paid, remaining);
+      if (netPaid >= advance) return res.status(400).json({ message: 'Advance already paid' });
+      amountToCharge = Math.min(advance - netPaid, remaining);
     } else if (type === 'balance') {
       if (remaining <= 0) return res.status(400).json({ message: 'Payment already completed' });
       amountToCharge = remaining;
@@ -209,7 +202,7 @@ exports.markCashPayment = async (req, res) => {
     const total = toNumber(payment.totalAmount);
     const paid = toNumber(payment.paidAmount) + toNumber(amount);
     payment.paidAmount = paid;
-    payment.status = computeStatus(total, paid);
+    payment.status = computeStatus(total, paid, payment.refundedAmount);
     await payment.save();
 
     if (payment.status === 'paid') {
@@ -268,6 +261,28 @@ exports.recordPayout = async (req, res) => {
   }
 };
 
+exports.refundPayment = async (req, res) => {
+  try {
+    const { paymentId, amount, method, notes } = req.body;
+    if (!paymentId || !amount) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const result = await recordRefund({
+      paymentId,
+      amount,
+      method,
+      createdBy: req.user?.id,
+      notes,
+    });
+
+    return res.json({ message: 'Refund recorded', payment: result.payment, transaction: result.refundTransaction });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({ message: 'Failed to record refund', error: error.message });
+  }
+};
+
 exports.razorpayWebhook = async (req, res) => {
   try {
     const signature = req.headers['x-razorpay-signature'];
@@ -317,7 +332,7 @@ exports.razorpayWebhook = async (req, res) => {
       const total = toNumber(payment.totalAmount);
       const paid = toNumber(payment.paidAmount) + toNumber(transaction.amount);
       payment.paidAmount = paid;
-      payment.status = computeStatus(total, paid);
+      payment.status = computeStatus(total, paid, payment.refundedAmount);
       await payment.save();
 
       if (payment.status === 'paid') {
@@ -348,5 +363,60 @@ exports.razorpayWebhook = async (req, res) => {
     return res.json({ message: 'Payment updated' });
   } catch (error) {
     return res.status(500).json({ message: 'Webhook handling failed', error: error.message });
+  }
+};
+
+exports.downloadReceipt = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const payment = await Payment.findByPk(paymentId);
+    if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+    if (req.user?.role !== 'organizer' && Number(req.user?.id) !== Number(payment.customerId) && Number(req.user?.id) !== Number(payment.vendorId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    if (!payment.receiptNumber && toNumber(payment.paidAmount) > 0) {
+      await ensureReceipt(payment);
+    }
+
+    const customer = await User.findByPk(payment.customerId, { attributes: ['name', 'email', 'phone'] });
+
+    let bookingLabel = '';
+    if (payment.bookingType === 'hall') {
+      const booking = await Booking.findByPk(payment.bookingId);
+      const hall = booking ? await Hall.findByPk(booking.hallId) : null;
+      bookingLabel = hall ? `Hall: ${hall.name}` : `Hall booking #${payment.bookingId}`;
+    } else {
+      const booking = await VendorBooking.findByPk(payment.bookingId);
+      const service = booking ? await VendorService.findByPk(booking.serviceId) : null;
+      bookingLabel = service ? `Vendor Service: ${service.name}` : `Vendor booking #${payment.bookingId}`;
+    }
+
+    const doc = new PDFDocument({ margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=receipt-${payment.id}.pdf`);
+    doc.pipe(res);
+
+    doc.fontSize(18).text('Payment Receipt', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Receipt No: ${payment.receiptNumber || 'N/A'}`);
+    doc.text(`Receipt Date: ${payment.receiptIssuedAt ? new Date(payment.receiptIssuedAt).toLocaleString() : 'N/A'}`);
+    doc.moveDown();
+
+    doc.text(`Customer: ${customer?.name || 'Customer'}`);
+    doc.text(`Email: ${customer?.email || 'N/A'}`);
+    doc.text(`Phone: ${customer?.phone || 'N/A'}`);
+    doc.moveDown();
+
+    doc.text(bookingLabel);
+    doc.text(`Total Amount: Rs ${payment.totalAmount}`);
+    doc.text(`Paid Amount: Rs ${payment.paidAmount}`);
+    doc.text(`Refunded Amount: Rs ${payment.refundedAmount}`);
+    doc.text(`Status: ${payment.status}`);
+
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to generate receipt', error: error.message });
   }
 };

@@ -12,6 +12,7 @@ const packageRoutes = require('./src/routes/packageRoutes');
 const vendorBookingRoutes = require('./src/routes/vendorBookingRoutes');
 const organizerRoutes = require('./src/routes/organizerRoutes');
 const reviewRoutes = require('./src/routes/reviewRoutes');
+const disputeRoutes = require('./src/routes/disputeRoutes');
 const Hall = require('./src/models/Hall');
 const Booking = require('./src/models/Booking');
 const BookingLock = require('./src/models/BookingLock');
@@ -25,6 +26,8 @@ const VendorAvailability = require('./src/models/VendorAvailability');
 const User = require('./src/models/User');
 const UserSettings = require('./src/models/UserSettings');
 const Review = require('./src/models/Review');
+const ReviewReport = require('./src/models/ReviewReport');
+const Dispute = require('./src/models/Dispute');
 const path = require('path');
 const aiRoutes = require('./src/routes/aiRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
@@ -62,13 +65,14 @@ app.use('/api/packages', packageRoutes);
 app.use('/api/vendor-bookings', vendorBookingRoutes);
 app.use('/api/organizer', organizerRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/disputes', disputeRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Test route
 app.get('/', (req, res) => {
-  res.send('Event Management API is Running 🚀');
+  res.send('Event Management API is Running');
 });
 
 // Sync database and start server
@@ -93,6 +97,12 @@ Hall.hasMany(Review, { foreignKey: 'hallId' });
 Review.belongsTo(Hall, { foreignKey: 'hallId' });
 VendorService.hasMany(Review, { foreignKey: 'serviceId' });
 Review.belongsTo(VendorService, { foreignKey: 'serviceId' });
+Review.hasMany(ReviewReport, { foreignKey: 'reviewId' });
+ReviewReport.belongsTo(Review, { foreignKey: 'reviewId' });
+User.hasMany(ReviewReport, { foreignKey: 'reporterId' });
+ReviewReport.belongsTo(User, { foreignKey: 'reporterId' });
+User.hasMany(Dispute, { foreignKey: 'openedBy' });
+Dispute.belongsTo(User, { foreignKey: 'openedBy' });
 
 // Ensure the 'uploads' folder exists!
 const fs = require('fs');

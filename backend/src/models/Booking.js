@@ -16,6 +16,9 @@ const Booking = sequelize.define(
     startTime: { type: DataTypes.TIME, allowNull: true }, // For hourly/half-day
     endTime: { type: DataTypes.TIME, allowNull: true }, // For hourly/half-day
     status: { type: DataTypes.STRING, defaultValue: 'confirmed' }, // confirmed, cancelled
+    cancelledAt: { type: DataTypes.DATE, allowNull: true },
+    cancelledBy: { type: DataTypes.INTEGER, allowNull: true },
+    cancelReason: { type: DataTypes.STRING, allowNull: true },
   },
   {
     indexes: [

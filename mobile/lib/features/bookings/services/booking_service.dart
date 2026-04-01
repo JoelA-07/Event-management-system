@@ -58,7 +58,7 @@ class BookingService {
     }
   }
 
-Future<List<dynamic>> fetchUserBookings(int userId, String role) async {
+  Future<List<dynamic>> fetchUserBookings(int userId, String role) async {
     try {
       final response = await _dio.get("${AppConstants.baseUrl}/bookings/user/$userId/$role");
       return response.data;
@@ -67,5 +67,25 @@ Future<List<dynamic>> fetchUserBookings(int userId, String role) async {
     }
   }
 
+  Future<Response?> cancelBooking({
+    required int bookingId,
+    String? reason,
+    double? refundAmount,
+    String? refundMethod,
+    bool? autoRefund,
+  }) async {
+    try {
+      return await _dio.post(
+        "${AppConstants.baseUrl}/bookings/$bookingId/cancel",
+        data: {
+          if (reason != null) "reason": reason,
+          if (refundAmount != null) "refundAmount": refundAmount,
+          if (refundMethod != null) "refundMethod": refundMethod,
+          if (autoRefund != null) "autoRefund": autoRefund,
+        },
+      );
+    } on DioException catch (e) {
+      return e.response;
+    }
+  }
 }
-

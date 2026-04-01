@@ -10,9 +10,10 @@ const Payment = sequelize.define('Payment', {
   totalAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
   advanceAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
   paidAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  refundedAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
   organizerFeePercent: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
   status: {
-    type: DataTypes.ENUM('pending', 'partial', 'paid'),
+    type: DataTypes.ENUM('pending', 'partial', 'paid', 'refunded'),
     allowNull: false,
     defaultValue: 'pending',
   },
