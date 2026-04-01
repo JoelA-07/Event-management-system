@@ -14,16 +14,37 @@ class VendorBookingsScreen extends StatefulWidget {
 
 class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
   final VendorBookingService _service = VendorBookingService();
+  final ScrollController _scrollController = ScrollController();
+
   List<dynamic> _bookings = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  int _page = 1;
+  int _limit = 20;
+  int _totalPages = 1;
 
   @override
   void initState() {
     super.initState();
-    _loadBookings();
+    _loadBookings(reset: true);
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _loadBookings() async {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_loadingMore && _page <= _totalPages) {
+        _loadBookings(reset: false);
+      }
+    }
+  }
+
+  Future<void> _loadBookings({bool reset = true}) async {
     const storage = FlutterSecureStorage();
     final vendorId = await storage.read(key: "userId");
     if (vendorId == null) {
@@ -33,11 +54,32 @@ class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
       });
       return;
     }
-    final bookings = await _service.fetchVendorBookings(int.parse(vendorId));
-    if (!mounted) return;
+
+    if (reset) {
+      setState(() {
+        _loading = true;
+        _page = 1;
+      });
+    } else {
+      if (_loadingMore || _page > _totalPages) return;
+      setState(() => _loadingMore = true);
+    }
+
+    final res = await _service.fetchVendorBookingsPaged(
+      vendorId: int.parse(vendorId),
+      page: _page,
+      limit: _limit,
+    );
+
+    final items = List<dynamic>.from(res['data'] ?? []);
+    final totalPages = res['meta']?['totalPages'] ?? 1;
+
     setState(() {
-      _bookings = bookings;
+      _bookings = reset ? items : [..._bookings, ...items];
+      _totalPages = totalPages;
+      _page += 1;
       _loading = false;
+      _loadingMore = false;
     });
   }
 
@@ -58,7 +100,7 @@ class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
     final res = await _service.updateBookingStatus(bookingId: bookingId, status: status);
     if (!mounted) return;
     if (res?.statusCode == 200) {
-      _loadBookings();
+      _loadBookings(reset: true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(res?.data['message'] ?? "Failed to update status")),
@@ -87,7 +129,7 @@ class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
               );
               if (!mounted) return;
               if (res?.statusCode == 200) {
-                _loadBookings();
+                _loadBookings(reset: true);
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text(res?.data['message'] ?? 'Cancel failed')),
@@ -110,11 +152,19 @@ class _VendorBookingsScreenState extends State<VendorBookingsScreen> {
           : _bookings.isEmpty
               ? const Center(child: Text("No bookings yet"))
               : RefreshIndicator(
-                  onRefresh: _loadBookings,
+                  onRefresh: () => _loadBookings(reset: true),
                   child: ListView.builder(
+                    controller: _scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: _bookings.length,
+                    itemCount: _bookings.length + (_loadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
+                      if (index >= _bookings.length) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+
                       final booking = _bookings[index];
                       final status = (booking['status'] ?? 'pending').toString();
                       final date = booking['bookingDate']?.toString() ?? '';

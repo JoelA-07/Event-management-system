@@ -14,6 +14,7 @@ class HallListScreen extends StatefulWidget {
 
 class _HallListScreenState extends State<HallListScreen> {
   String searchQuery = "";
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -22,16 +23,31 @@ class _HallListScreenState extends State<HallListScreen> {
       if (!mounted) return;
       context.read<HallProvider>().loadHalls();
     });
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final provider = context.read<HallProvider>();
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!provider.isLoadingMore && provider.hasMore) {
+        provider.loadMore();
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final hallProvider = context.watch<HallProvider>();
 
-    // Filtering logic for the search bar
     final filteredHalls = hallProvider.halls.where((hall) {
       return hall.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-             hall.location.toLowerCase().contains(searchQuery.toLowerCase());
+          hall.location.toLowerCase().contains(searchQuery.toLowerCase());
     }).toList();
 
     return Scaffold(
@@ -50,7 +66,6 @@ class _HallListScreenState extends State<HallListScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
             Expanded(
               child: hallProvider.isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
@@ -59,8 +74,15 @@ class _HallListScreenState extends State<HallListScreen> {
                       : RefreshIndicator(
                           onRefresh: () => hallProvider.loadHalls(),
                           child: ListView.builder(
-                            itemCount: filteredHalls.length,
+                            controller: _scrollController,
+                            itemCount: filteredHalls.length + (hallProvider.isLoadingMore ? 1 : 0),
                             itemBuilder: (context, index) {
+                              if (index >= filteredHalls.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(child: CircularProgressIndicator()),
+                                );
+                              }
                               return HallCard(
                                 hall: filteredHalls[index],
                                 onTap: () {

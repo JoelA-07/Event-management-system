@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:mobile/core/api_client.dart';
 import 'package:mobile/core/constants.dart';
+import 'package:mobile/core/api_client.dart';
 
 class PaymentService {
   final Dio _dio = ApiClient().dio;
@@ -8,15 +8,19 @@ class PaymentService {
   Future<Map<String, dynamic>?> fetchSummary({
     required String bookingType,
     required int bookingId,
+    int page = 1,
+    int limit = 20,
   }) async {
     try {
       final response = await _dio.get(
         "${AppConstants.baseUrl}/payments/booking/$bookingType/$bookingId",
+        queryParameters: {"page": page, "limit": limit},
       );
-      return Map<String, dynamic>.from(response.data);
-    } on DioException {
-      return null;
-    }
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<String?> createPaymentLink({
@@ -28,15 +32,42 @@ class PaymentService {
       final response = await _dio.post(
         "${AppConstants.baseUrl}/payments/link",
         data: {
-          'bookingType': bookingType,
-          'bookingId': bookingId,
-          'type': type,
+          "bookingType": bookingType,
+          "bookingId": bookingId,
+          "type": type,
         },
       );
-      return response.data?['url']?.toString();
-    } on DioException catch (e) {
-      return e.response?.data?['message']?.toString();
+      if (response.statusCode == 200) {
+        return response.data['url']?.toString();
+      }
+    } catch (e) {
+      if (e is DioException) {
+        return e.response?.data['message']?.toString();
+      }
     }
+    return null;
+  }
+
+  Future<String?> updatePlan({
+    required int paymentId,
+    required double advanceAmount,
+    double? organizerFeePercent,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        "${AppConstants.baseUrl}/payments/plan/$paymentId",
+        data: {
+          "advanceAmount": advanceAmount,
+          if (organizerFeePercent != null) "organizerFeePercent": organizerFeePercent,
+        },
+      );
+      if (response.statusCode == 200) {
+        return response.data['message']?.toString();
+      }
+    } catch (e) {
+      if (e is DioException) return e.response?.data['message']?.toString();
+    }
+    return null;
   }
 
   Future<String?> markCash({
@@ -49,35 +80,19 @@ class PaymentService {
       final response = await _dio.post(
         "${AppConstants.baseUrl}/payments/mark-cash",
         data: {
-          'bookingType': bookingType,
-          'bookingId': bookingId,
-          'amount': amount,
-          'type': type,
+          "bookingType": bookingType,
+          "bookingId": bookingId,
+          "amount": amount,
+          "type": type,
         },
       );
-      return response.data?['message']?.toString();
-    } on DioException catch (e) {
-      return e.response?.data?['message']?.toString() ?? 'Failed to record cash';
+      if (response.statusCode == 200) {
+        return response.data['message']?.toString();
+      }
+    } catch (e) {
+      if (e is DioException) return e.response?.data['message']?.toString();
     }
-  }
-
-  Future<String?> updatePlan({
-    required int paymentId,
-    required double advanceAmount,
-    double? organizerFeePercent,
-  }) async {
-    try {
-      final response = await _dio.patch(
-        "${AppConstants.baseUrl}/payments/plan/$paymentId",
-        data: {
-          'advanceAmount': advanceAmount,
-          'organizerFeePercent': organizerFeePercent,
-        },
-      );
-      return response.data?['message']?.toString();
-    } on DioException catch (e) {
-      return e.response?.data?['message']?.toString() ?? 'Failed to update plan';
-    }
+    return null;
   }
 
   Future<String?> recordPayout({
@@ -90,15 +105,18 @@ class PaymentService {
       final response = await _dio.post(
         "${AppConstants.baseUrl}/payments/payouts",
         data: {
-          'paymentId': paymentId,
-          'vendorId': vendorId,
-          'amount': amount,
-          'notes': notes,
+          "paymentId": paymentId,
+          "vendorId": vendorId,
+          "amount": amount,
+          if (notes != null) "notes": notes,
         },
       );
-      return response.data?['message']?.toString();
-    } on DioException catch (e) {
-      return e.response?.data?['message']?.toString() ?? 'Failed to record payout';
+      if (response.statusCode == 200) {
+        return response.data['message']?.toString();
+      }
+    } catch (e) {
+      if (e is DioException) return e.response?.data['message']?.toString();
     }
+    return null;
   }
 }

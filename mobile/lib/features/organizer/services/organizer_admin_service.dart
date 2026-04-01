@@ -5,8 +5,11 @@ import 'package:mobile/core/constants.dart';
 class OrganizerAdminService {
   final Dio _dio = ApiClient().dio;
 
-  Future<Map<String, dynamic>> fetchApprovals() async {
-    final res = await _dio.get("${AppConstants.baseUrl}/organizer/approvals");
+  Future<Map<String, dynamic>> fetchApprovals({int page = 1, int limit = 20}) async {
+    final res = await _dio.get(
+      "${AppConstants.baseUrl}/organizer/approvals",
+      queryParameters: {"page": page, "limit": limit},
+    );
     return Map<String, dynamic>.from(res.data);
   }
 
@@ -24,17 +27,27 @@ class OrganizerAdminService {
     );
   }
 
-  Future<Map<String, dynamic>> fetchPayouts() async {
-    final res = await _dio.get("${AppConstants.baseUrl}/organizer/payouts");
+  Future<Map<String, dynamic>> fetchPayouts({int page = 1, int limit = 20}) async {
+    final res = await _dio.get(
+      "${AppConstants.baseUrl}/organizer/payouts",
+      queryParameters: {"page": page, "limit": limit},
+    );
     return Map<String, dynamic>.from(res.data);
   }
 
-  Future<List<dynamic>> fetchDisputes({String? status}) async {
+  Future<Map<String, dynamic>> fetchDisputes({String? status, int page = 1, int limit = 20}) async {
+    final params = {"page": page, "limit": limit, if (status != null) "status": status};
     final res = await _dio.get(
       "${AppConstants.baseUrl}/disputes",
-      queryParameters: status == null ? null : {"status": status},
+      queryParameters: params,
     );
-    return List<dynamic>.from(res.data as List);
+    if (res.data is Map && res.data['data'] is List) {
+      return Map<String, dynamic>.from(res.data as Map);
+    }
+    return {
+      "data": List<dynamic>.from(res.data as List),
+      "meta": {"page": 1, "limit": (res.data as List).length, "total": (res.data as List).length, "totalPages": 1},
+    };
   }
 
   Future<Response<dynamic>> updateDispute(int id, String status, {String? resolutionNotes}) {
@@ -44,12 +57,18 @@ class OrganizerAdminService {
     );
   }
 
-  Future<List<dynamic>> fetchReviewReports({String status = 'open'}) async {
+  Future<Map<String, dynamic>> fetchReviewReports({String status = 'open', int page = 1, int limit = 20}) async {
     final res = await _dio.get(
       "${AppConstants.baseUrl}/reviews/reports",
-      queryParameters: {"status": status},
+      queryParameters: {"status": status, "page": page, "limit": limit},
     );
-    return List<dynamic>.from(res.data as List);
+    if (res.data is Map && res.data['data'] is List) {
+      return Map<String, dynamic>.from(res.data as Map);
+    }
+    return {
+      "data": List<dynamic>.from(res.data as List),
+      "meta": {"page": 1, "limit": (res.data as List).length, "total": (res.data as List).length, "totalPages": 1},
+    };
   }
 
   Future<Response<dynamic>> resolveReviewReport(int id) {

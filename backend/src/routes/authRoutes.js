@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, refresh, logout, googleLogin, firebaseLogin, updateFcmToken } = require('../controllers/authController.js');
+const { register, login, refresh, logout, logoutAll, googleLogin, firebaseLogin, updateFcmToken } = require('../controllers/authController.js');
 const { verifyToken } = require('../middleware/auth');
 
 router.post('/register', register);
@@ -9,6 +9,7 @@ router.post('/google', googleLogin);
 router.post('/firebase', firebaseLogin);
 router.post('/refresh', refresh);
 router.post('/logout', logout);
+router.post('/logout-all', verifyToken, logoutAll);
 router.post('/fcm-token', verifyToken, updateFcmToken);
 
 module.exports = router;

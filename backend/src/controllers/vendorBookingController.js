@@ -7,6 +7,7 @@ const sequelize = require('../config/db');
 const { withTransactionRetry } = require('../utils/withTransactionRetry');
 const { notifyUser, notifyOrganizers } = require('../services/notificationService');
 const { recordRefund, toNumber } = require('../services/paymentService');
+const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
 const { Op } = require('sequelize');
 
 const SLOT_PRESETS = {
@@ -232,6 +233,13 @@ exports.getVendorBookings = async (req, res) => {
     if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(vendorId)) {
       return res.status(403).json({ message: 'Access denied' });
     }
+
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await VendorBooking.findAndCountAll({ where: { vendorId }, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
+
     const bookings = await VendorBooking.findAll({
       where: { vendorId },
       order: [['bookingDate', 'DESC']],
@@ -249,6 +257,13 @@ exports.getCustomerVendorBookings = async (req, res) => {
     if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(customerId)) {
       return res.status(403).json({ message: 'Access denied' });
     }
+
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await VendorBooking.findAndCountAll({ where: { customerId }, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
+
     const bookings = await VendorBooking.findAll({
       where: { customerId },
       order: [['bookingDate', 'DESC']],

@@ -1,6 +1,7 @@
 const Review = require('../models/Review');
 const ReviewReport = require('../models/ReviewReport');
 const User = require('../models/User');
+const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
 
 exports.createReview = async (req, res) => {
   try {
@@ -33,6 +34,17 @@ exports.getHallReviews = async (req, res) => {
     const { hallId } = req.params;
     const isOrganizer = req.user?.role === 'organizer';
     const where = { hallId, ...(isOrganizer ? {} : { status: 'approved' }) };
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await Review.findAndCountAll({
+        where,
+        include: [{ model: User, attributes: ['id', 'name'] }],
+        order: [['createdAt', 'DESC']],
+        limit,
+        offset,
+      });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
     const reviews = await Review.findAll({
       where,
       include: [{ model: User, attributes: ['id', 'name'] }],
@@ -49,6 +61,17 @@ exports.getServiceReviews = async (req, res) => {
     const { serviceId } = req.params;
     const isOrganizer = req.user?.role === 'organizer';
     const where = { serviceId, ...(isOrganizer ? {} : { status: 'approved' }) };
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await Review.findAndCountAll({
+        where,
+        include: [{ model: User, attributes: ['id', 'name'] }],
+        order: [['createdAt', 'DESC']],
+        limit,
+        offset,
+      });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
     const reviews = await Review.findAll({
       where,
       include: [{ model: User, attributes: ['id', 'name'] }],
@@ -93,6 +116,22 @@ exports.reportReview = async (req, res) => {
 exports.getReviewReports = async (req, res) => {
   try {
     const status = req.query.status || 'open';
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await ReviewReport.findAndCountAll({
+        where: { status },
+        include: [
+          {
+            model: Review,
+            include: [{ model: User, attributes: ['id', 'name'] }],
+          },
+        ],
+        order: [['id', 'DESC']],
+        limit,
+        offset,
+      });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
     const reports = await ReviewReport.findAll({
       where: { status },
       include: [

@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const env = require('./src/config/env');
 const sequelize = require('./src/config/db');
 const authRoutes = require('./src/routes/authRoutes');
@@ -28,11 +29,20 @@ const UserSettings = require('./src/models/UserSettings');
 const Review = require('./src/models/Review');
 const ReviewReport = require('./src/models/ReviewReport');
 const Dispute = require('./src/models/Dispute');
+const RefreshToken = require('./src/models/RefreshToken');
 const path = require('path');
 const aiRoutes = require('./src/routes/aiRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 
 const app = express();
+
+// Rate limiting (default: 120 requests / 1 minute / IP)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Middleware
 app.use(cors({
@@ -53,6 +63,8 @@ app.use((req, res, next) => {
   }
   return express.json()(req, res, next);
 });
+
+app.use('/api', apiLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -77,6 +89,7 @@ app.get('/', (req, res) => {
 
 // Sync database and start server
 const PORT = env.PORT;
+const shouldAlter = String(env.DB_SYNC_ALTER || '').toLowerCase() === 'true';
 
 // Define Relationships
 Hall.hasMany(Booking, { foreignKey: 'hallId' });
@@ -103,6 +116,8 @@ User.hasMany(ReviewReport, { foreignKey: 'reporterId' });
 ReviewReport.belongsTo(User, { foreignKey: 'reporterId' });
 User.hasMany(Dispute, { foreignKey: 'openedBy' });
 Dispute.belongsTo(User, { foreignKey: 'openedBy' });
+User.hasMany(RefreshToken, { foreignKey: 'userId' });
+RefreshToken.belongsTo(User, { foreignKey: 'userId' });
 
 // Ensure the 'uploads' folder exists!
 const fs = require('fs');
@@ -110,7 +125,9 @@ if (!fs.existsSync('./uploads')) {
     fs.mkdirSync('./uploads');
 }
 
-sequelize.sync({ alter: true }) // Updates tables without dropping data
+const syncOptions = shouldAlter ? { alter: true } : {};
+
+sequelize.sync(syncOptions)
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);

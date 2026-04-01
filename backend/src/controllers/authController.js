@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -22,6 +23,14 @@ function getGoogleClient() {
     throw new Error('Google OAuth is not configured');
   }
   return new OAuth2Client(GOOGLE_WEB_CLIENT_ID, GOOGLE_WEB_CLIENT_SECRET, 'postmessage');
+}
+
+function getRequestMeta(req) {
+  return {
+    deviceId: req.body?.deviceId || null,
+    userAgent: req.get('user-agent') || null,
+    ipAddress: req.ip || null,
+  };
 }
 
 async function findOrCreateGoogleUser(profile) {
@@ -66,7 +75,7 @@ async function findOrCreateFirebaseUser(profile) {
   return user;
 }
 
-async function issueTokens(user) {
+async function issueTokens(user, meta = {}) {
   if (!JWT_SECRET) {
     throw new Error('Server auth misconfiguration');
   }
@@ -82,11 +91,30 @@ async function issueTokens(user) {
     Date.now() + REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000,
   );
 
-  user.refreshTokenHash = refreshTokenHash;
-  user.refreshTokenExpiresAt = refreshTokenExpiresAt;
-  await user.save();
+  await RefreshToken.create({
+    userId: user.id,
+    tokenHash: refreshTokenHash,
+    expiresAt: refreshTokenExpiresAt,
+    deviceId: meta.deviceId || null,
+    userAgent: meta.userAgent || null,
+    ipAddress: meta.ipAddress || null,
+  });
 
   return { accessToken, refreshToken };
+}
+
+async function rotateRefreshToken(tokenRecord, meta = {}) {
+  tokenRecord.revokedAt = new Date();
+  tokenRecord.lastUsedAt = new Date();
+  await tokenRecord.save();
+
+  const user = await User.findByPk(tokenRecord.userId);
+  if (!user) {
+    const err = new Error('User not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return issueTokens(user, meta);
 }
 
 // Register
@@ -140,11 +168,11 @@ exports.login = async (req, res) => {
     }
 
     // Create JWT token
-    const { accessToken, refreshToken } = await issueTokens(user);
+    const tokens = await issueTokens(user, getRequestMeta(req));
 
     res.json({
-      token: accessToken,
-      refreshToken,
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {
@@ -160,8 +188,8 @@ exports.googleLogin = async (req, res) => {
     }
 
     const client = getGoogleClient();
-    const { tokens } = await client.getToken(serverAuthCode);
-    const tokenToVerify = tokens?.id_token || idToken;
+    const { tokens: googleTokens } = await client.getToken(serverAuthCode);
+    const tokenToVerify = googleTokens?.id_token || idToken;
     if (!tokenToVerify) {
       return res.status(400).json({ message: 'Missing id token' });
     }
@@ -180,10 +208,10 @@ exports.googleLogin = async (req, res) => {
       name: payload.name,
     });
 
-    const { accessToken, refreshToken } = await issueTokens(user);
+    const tokens = await issueTokens(user, getRequestMeta(req));
     res.json({
-      token: accessToken,
-      refreshToken,
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {
@@ -208,11 +236,11 @@ exports.firebaseLogin = async (req, res) => {
     }
 
     const user = await findOrCreateFirebaseUser({ email, name });
-    const { accessToken, refreshToken } = await issueTokens(user);
+    const tokens = await issueTokens(user, getRequestMeta(req));
 
     res.json({
-      token: accessToken,
-      refreshToken,
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {
@@ -245,17 +273,19 @@ exports.refresh = async (req, res) => {
     }
 
     const refreshTokenHash = hashToken(refreshToken);
-    const user = await User.findOne({ where: { refreshTokenHash } });
-    if (!user || !user.refreshTokenExpiresAt || user.refreshTokenExpiresAt < new Date()) {
+    const tokenRecord = await RefreshToken.findOne({
+      where: { tokenHash: refreshTokenHash, revokedAt: null },
+    });
+    if (!tokenRecord || !tokenRecord.expiresAt || tokenRecord.expiresAt < new Date()) {
       return res.status(401).json({ message: 'Invalid or expired refresh token' });
     }
 
-    const { accessToken, refreshToken: newRefreshToken } = await issueTokens(user);
+    const tokens = await rotateRefreshToken(tokenRecord, getRequestMeta(req));
 
     res.json({
-      token: accessToken,
-      refreshToken: newRefreshToken,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: { id: tokenRecord.userId },
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -270,13 +300,25 @@ exports.logout = async (req, res) => {
     }
 
     const refreshTokenHash = hashToken(refreshToken);
-    const user = await User.findOne({ where: { refreshTokenHash } });
-    if (user) {
-      user.refreshTokenHash = null;
-      user.refreshTokenExpiresAt = null;
-      await user.save();
+    const tokenRecord = await RefreshToken.findOne({ where: { tokenHash: refreshTokenHash, revokedAt: null } });
+    if (tokenRecord) {
+      tokenRecord.revokedAt = new Date();
+      await tokenRecord.save();
     }
     return res.json({ message: 'Logged out' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.logoutAll = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    await RefreshToken.update(
+      { revokedAt: new Date() },
+      { where: { userId: req.user.id, revokedAt: null } },
+    );
+    return res.json({ message: 'Logged out from all devices' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }

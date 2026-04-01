@@ -5,6 +5,7 @@ const CateringMenu = require('../models/CateringMenu');
 const Booking = require('../models/Booking');
 const Hall = require('../models/Hall');
 const User = require('../models/User');
+const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
 
 const EVENT_KEYWORDS = {
   wedding: ['wedding', 'marriage', 'engagement'],
@@ -183,6 +184,11 @@ exports.getAllVendorServices = async (req, res) => {
   try {
     const isOrganizer = req.user?.role === 'organizer';
     const where = isOrganizer ? undefined : { approvalStatus: 'approved' };
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await VendorService.findAndCountAll({ where, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
     const services = await VendorService.findAll({ where, order: [['id', 'DESC']] });
     res.json(services);
   } catch (error) {
@@ -198,6 +204,11 @@ exports.getServicesByCategory = async (req, res) => {
       category,
       ...(isOrganizer ? {} : { approvalStatus: 'approved' }),
     };
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await VendorService.findAndCountAll({ where, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
     const services = await VendorService.findAll({
       where,
       order: [['id', 'DESC']],
@@ -214,6 +225,11 @@ exports.getMyServices = async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
     if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(vendorId)) {
       return res.status(403).json({ message: 'Access denied' });
+    }
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await VendorService.findAndCountAll({ where: { vendorId }, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
     }
     const services = await VendorService.findAll({
       where: { vendorId },
@@ -232,6 +248,11 @@ exports.getMyMenus = async (req, res) => {
     if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(vendorId)) {
       return res.status(403).json({ message: 'Access denied' });
     }
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await CateringMenu.findAndCountAll({ where: { vendorId }, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
     const menus = await CateringMenu.findAll({
       where: { vendorId },
       order: [['id', 'DESC']],
@@ -245,6 +266,11 @@ exports.getMyMenus = async (req, res) => {
 exports.getMenusPublic = async (req, res) => {
   try {
     const { vendorId } = req.params;
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await CateringMenu.findAndCountAll({ where: { vendorId }, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
     const menus = await CateringMenu.findAll({
       where: { vendorId },
       order: [['id', 'DESC']],
@@ -389,6 +415,11 @@ exports.getEventRecommendations = async (req, res) => {
   try {
     const { eventType } = req.params;
     const where = buildEventSearchWhere(eventType);
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await VendorService.findAndCountAll({ where, limit, offset, order: [['id', 'DESC']] });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
     const services = await VendorService.findAll({
       where,
       limit: 20,

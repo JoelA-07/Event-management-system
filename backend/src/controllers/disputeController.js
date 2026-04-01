@@ -2,6 +2,7 @@ const Dispute = require('../models/Dispute');
 const Booking = require('../models/Booking');
 const VendorBooking = require('../models/VendorBooking');
 const Payment = require('../models/Payment');
+const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
 
 exports.createDispute = async (req, res) => {
   try {
@@ -29,6 +30,13 @@ exports.getDisputes = async (req, res) => {
   try {
     const status = req.query.status;
     const where = status ? { status } : undefined;
+
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await Dispute.findAndCountAll({ where, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
+
     const disputes = await Dispute.findAll({ where, order: [['id', 'DESC']] });
     res.json(disputes);
   } catch (error) {
@@ -38,6 +46,12 @@ exports.getDisputes = async (req, res) => {
 
 exports.getMyDisputes = async (req, res) => {
   try {
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await Dispute.findAndCountAll({ where: { openedBy: req.user?.id }, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
+
     const disputes = await Dispute.findAll({ where: { openedBy: req.user?.id }, order: [['id', 'DESC']] });
     res.json(disputes);
   } catch (error) {

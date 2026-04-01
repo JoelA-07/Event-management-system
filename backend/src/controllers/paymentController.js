@@ -9,6 +9,7 @@ const Payout = require('../models/Payout');
 const { getRazorpayClient, verifyWebhookSignature } = require('../services/razorpayService');
 const { notifyUser, notifyOrganizers } = require('../services/notificationService');
 const { toNumber, computeStatus, recordRefund } = require('../services/paymentService');
+const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
 const PDFDocument = require('pdfkit');
 
 async function ensureReceipt(payment) {
@@ -68,8 +69,31 @@ exports.getPaymentSummary = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const transactions = await PaymentTransaction.findAll({ where: { paymentId: payment.id }, order: [['id', 'DESC']] });
-    const payouts = await Payout.findAll({ where: { paymentId: payment.id }, order: [['id', 'DESC']] });
+    const transactionsQuery = {
+      where: { paymentId: payment.id },
+      order: [['id', 'DESC']],
+    };
+    const payoutsQuery = {
+      where: { paymentId: payment.id },
+      order: [['id', 'DESC']],
+    };
+
+    let transactionsResult;
+    let payoutsResult;
+
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      transactionsResult = await PaymentTransaction.findAndCountAll({ ...transactionsQuery, limit, offset });
+      payoutsResult = await Payout.findAndCountAll({ ...payoutsQuery, limit, offset });
+      return res.json({
+        payment,
+        transactions: buildPageResponse({ rows: transactionsResult.rows, count: transactionsResult.count, page, limit }),
+        payouts: buildPageResponse({ rows: payoutsResult.rows, count: payoutsResult.count, page, limit }),
+      });
+    }
+
+    const transactions = await PaymentTransaction.findAll(transactionsQuery);
+    const payouts = await Payout.findAll(payoutsQuery);
 
     return res.json({ payment, transactions, payouts });
   } catch (error) {

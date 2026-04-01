@@ -45,6 +45,35 @@ class VendorBookingService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchVendorBookingsPaged({
+    required int vendorId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get(
+        "${AppConstants.baseUrl}/vendor-bookings/vendor/$vendorId",
+        queryParameters: {"page": page, "limit": limit},
+      );
+      if (response.statusCode == 200) {
+        final body = response.data;
+        if (body is Map && body['data'] is List && body['meta'] is Map) {
+          return Map<String, dynamic>.from(body);
+        }
+        if (body is List) {
+          return {
+            "data": body,
+            "meta": {"page": 1, "limit": body.length, "total": body.length, "totalPages": 1},
+          };
+        }
+      }
+    } catch (_) {}
+    return {
+      "data": <dynamic>[],
+      "meta": {"page": page, "limit": limit, "total": 0, "totalPages": 1},
+    };
+  }
+
   Future<List<dynamic>> fetchCustomerBookings(int customerId) async {
     try {
       final response = await _dio.get("${AppConstants.baseUrl}/vendor-bookings/customer/$customerId");

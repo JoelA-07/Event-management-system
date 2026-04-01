@@ -21,6 +21,39 @@ class VendorService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchServicesPage({
+    required String category,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get(
+        "${AppConstants.vendorsUrl}/$category",
+        queryParameters: {"page": page, "limit": limit},
+      );
+      if (response.statusCode == 200) {
+        final body = response.data;
+        if (body is Map && body['data'] is List && body['meta'] is Map) {
+          final list = List<dynamic>.from(body['data']);
+          return {
+            "items": list.map((json) => VendorModel.fromJson(json)).toList(),
+            "meta": Map<String, dynamic>.from(body['meta']),
+          };
+        }
+        if (body is List) {
+          return {
+            "items": body.map((json) => VendorModel.fromJson(json)).toList(),
+            "meta": {"page": 1, "limit": body.length, "total": body.length, "totalPages": 1},
+          };
+        }
+      }
+    } catch (_) {}
+    return {
+      "items": <VendorModel>[],
+      "meta": {"page": page, "limit": limit, "total": 0, "totalPages": 1},
+    };
+  }
+
   Future<List<VendorModel>> fetchEventRecommendations(String eventType) async {
     try {
       final response = await _dio.get("${AppConstants.vendorsUrl}/event/$eventType");

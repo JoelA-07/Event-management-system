@@ -6,6 +6,7 @@ const sequelize = require('../config/db');
 const { withTransactionRetry } = require('../utils/withTransactionRetry');
 const { notifyUser, notifyOrganizers } = require('../services/notificationService');
 const { recordRefund, toNumber } = require('../services/paymentService');
+const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
 const { Op } = require('sequelize');
 
 const SLOT_PRESETS = {
@@ -250,6 +251,41 @@ exports.getUserBookings = async (req, res) => {
     if (req.user.role !== 'organizer' && Number(req.user.id) !== Number(userId)) {
       return res.status(403).json({ message: "Access denied" });
     }
+
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      if (role === 'customer') {
+        const result = await Booking.findAndCountAll({
+          where: { customerId: userId },
+          include: [{ model: Hall, attributes: ['name', 'location', 'pricePerDay', 'imageUrl'] }],
+          order: [['id', 'DESC']],
+          limit,
+          offset,
+        });
+        return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+      }
+      if (role === 'organizer') {
+        const result = await Booking.findAndCountAll({
+          include: [{ model: Hall, attributes: ['name', 'location', 'pricePerDay'] }],
+          order: [['id', 'DESC']],
+          limit,
+          offset,
+        });
+        return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+      }
+      const result = await Booking.findAndCountAll({
+        include: [{
+          model: Hall,
+          where: { ownerId: userId },
+          attributes: ['name', 'pricePerDay'],
+        }],
+        order: [['id', 'DESC']],
+        limit,
+        offset,
+      });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
+
     let bookings;
 
     if (role === 'customer') {

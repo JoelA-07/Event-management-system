@@ -1,11 +1,11 @@
+const Hall = require('../models/Hall');
+const VendorService = require('../models/VendorService');
 const Booking = require('../models/Booking');
 const VendorBooking = require('../models/VendorBooking');
-const VendorService = require('../models/VendorService');
-const Hall = require('../models/Hall');
-const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Payout = require('../models/Payout');
 const { Op, fn, col, literal } = require('sequelize');
+const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
 
 exports.getOrganizerOverview = async (req, res) => {
   try {
@@ -123,6 +123,18 @@ exports.getOrganizerAnalytics = async (req, res) => {
 
 exports.listPendingApprovals = async (req, res) => {
   try {
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const [halls, services] = await Promise.all([
+        Hall.findAndCountAll({ where: { approvalStatus: 'pending' }, order: [['id', 'DESC']], limit, offset }),
+        VendorService.findAndCountAll({ where: { approvalStatus: 'pending' }, order: [['id', 'DESC']], limit, offset }),
+      ]);
+      return res.json({
+        halls: buildPageResponse({ rows: halls.rows, count: halls.count, page, limit }),
+        services: buildPageResponse({ rows: services.rows, count: services.count, page, limit }),
+      });
+    }
+
     const halls = await Hall.findAll({ where: { approvalStatus: 'pending' }, order: [['id', 'DESC']] });
     const services = await VendorService.findAll({ where: { approvalStatus: 'pending' }, order: [['id', 'DESC']] });
     res.json({ halls, services });
@@ -177,6 +189,18 @@ exports.approveVendorService = async (req, res) => {
 
 exports.getPayoutDashboard = async (req, res) => {
   try {
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const [payments, payouts] = await Promise.all([
+        Payment.findAndCountAll({ order: [['id', 'DESC']], limit, offset }),
+        Payout.findAndCountAll({ order: [['id', 'DESC']], limit, offset }),
+      ]);
+      return res.json({
+        payments: buildPageResponse({ rows: payments.rows, count: payments.count, page, limit }),
+        payouts: buildPageResponse({ rows: payouts.rows, count: payouts.count, page, limit }),
+      });
+    }
+
     const payments = await Payment.findAll({ order: [['id', 'DESC']], limit: 200 });
     const payouts = await Payout.findAll({ order: [['id', 'DESC']], limit: 200 });
     res.json({ payments, payouts });
@@ -187,6 +211,18 @@ exports.getPayoutDashboard = async (req, res) => {
 
 exports.getBookingDashboard = async (req, res) => {
   try {
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const [hallBookings, vendorBookings] = await Promise.all([
+        Booking.findAndCountAll({ order: [['id', 'DESC']], limit, offset }),
+        VendorBooking.findAndCountAll({ order: [['id', 'DESC']], limit, offset }),
+      ]);
+      return res.json({
+        hallBookings: buildPageResponse({ rows: hallBookings.rows, count: hallBookings.count, page, limit }),
+        vendorBookings: buildPageResponse({ rows: vendorBookings.rows, count: vendorBookings.count, page, limit }),
+      });
+    }
+
     const hallBookings = await Booking.findAll({ order: [['id', 'DESC']], limit: 200 });
     const vendorBookings = await VendorBooking.findAll({ order: [['id', 'DESC']], limit: 200 });
     res.json({ hallBookings, vendorBookings });

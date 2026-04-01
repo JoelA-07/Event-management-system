@@ -29,24 +29,72 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
   bool _loading = true;
   String _role = 'customer';
 
+  List<Map<String, dynamic>> _transactions = [];
+  List<Map<String, dynamic>> _payouts = [];
+  int _txPage = 1;
+  int _txTotalPages = 1;
+  bool _txLoadingMore = false;
+
   @override
   void initState() {
     super.initState();
-    _load();
+    _load(reset: true);
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool reset = true}) async {
+    if (reset) {
+      _txPage = 1;
+      _transactions = [];
+      _payouts = [];
+      _loading = true;
+    }
+
     final role = await _storage.read(key: 'role');
     final summary = await _service.fetchSummary(
       bookingType: widget.bookingType,
       bookingId: widget.bookingId,
+      page: _txPage,
+      limit: 20,
     );
     if (!mounted) return;
+
+    final payment = summary?['payment'];
+    final txBlock = summary?['transactions'];
+    final payoutBlock = summary?['payouts'];
+
+    List<Map<String, dynamic>> txItems = [];
+    List<Map<String, dynamic>> payoutItems = [];
+    int txTotalPages = 1;
+
+    if (txBlock is Map && txBlock['data'] is List) {
+      txItems = List<Map<String, dynamic>>.from(txBlock['data']);
+      txTotalPages = txBlock['meta']?['totalPages'] ?? 1;
+    } else if (txBlock is List) {
+      txItems = List<Map<String, dynamic>>.from(txBlock);
+    }
+
+    if (payoutBlock is Map && payoutBlock['data'] is List) {
+      payoutItems = List<Map<String, dynamic>>.from(payoutBlock['data']);
+    } else if (payoutBlock is List) {
+      payoutItems = List<Map<String, dynamic>>.from(payoutBlock);
+    }
+
     setState(() {
       _role = role ?? 'customer';
       _summary = summary;
+      _transactions = reset ? txItems : [..._transactions, ...txItems];
+      _payouts = reset ? payoutItems : [..._payouts, ...payoutItems];
+      _txTotalPages = txTotalPages;
+      _txPage += 1;
       _loading = false;
+      _txLoadingMore = false;
     });
+  }
+
+  Future<void> _loadMoreTx() async {
+    if (_txLoadingMore || _txPage > _txTotalPages) return;
+    setState(() => _txLoadingMore = true);
+    await _load(reset: false);
   }
 
   double _num(dynamic value) {
@@ -137,7 +185,7 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message ?? 'Cash recorded')));
-    await _load();
+    await _load(reset: true);
   }
 
   Future<void> _setPlan() async {
@@ -200,7 +248,7 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message ?? 'Plan updated')));
-    await _load();
+    await _load(reset: true);
   }
 
   Future<void> _recordPayout() async {
@@ -264,13 +312,13 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message ?? 'Payout recorded')));
-    await _load();
+    await _load(reset: true);
   }
 
   Future<void> _printReceipt() async {
     if (_summary == null) return;
     final payment = Map<String, dynamic>.from(_summary!['payment']);
-    final transactions = List<Map<String, dynamic>>.from(_summary!['transactions'] ?? []);
+    final transactions = List<Map<String, dynamic>>.from(_transactions);
 
     final doc = pw.Document();
     doc.addPage(
@@ -319,8 +367,6 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
     }
 
     final payment = Map<String, dynamic>.from(_summary!['payment']);
-    final transactions = List<Map<String, dynamic>>.from(_summary!['transactions'] ?? []);
-    final payouts = List<Map<String, dynamic>>.from(_summary!['payouts'] ?? []);
 
     final total = _num(payment['totalAmount']);
     final paid = _num(payment['paidAmount']);
@@ -334,7 +380,7 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Payments')),
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(reset: true),
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -342,9 +388,21 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
             const SizedBox(height: 12),
             if (isCustomer) _customerActions(advance, remaining, paid),
             if (isOrganizer) _organizerActions(),
-            if (isVendor) _vendorPayouts(payouts),
+            if (isVendor) _vendorPayouts(_payouts),
             const SizedBox(height: 16),
-            _transactionsList(transactions),
+            _transactionsList(),
+            if (_txLoadingMore)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            if (_txPage <= _txTotalPages)
+              Center(
+                child: TextButton(
+                  onPressed: _loadMoreTx,
+                  child: const Text('Load more transactions'),
+                ),
+              ),
             if ((payment['status'] ?? '') == 'paid')
               Padding(
                 padding: const EdgeInsets.only(top: 16),
@@ -425,15 +483,15 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
     );
   }
 
-  Widget _transactionsList(List<Map<String, dynamic>> transactions) {
+  Widget _transactionsList() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Transactions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        if (transactions.isEmpty)
+        if (_transactions.isEmpty)
           const Text('No transactions yet.', style: TextStyle(color: Colors.grey)),
-        ...transactions.map((t) {
+        ..._transactions.map((t) {
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(

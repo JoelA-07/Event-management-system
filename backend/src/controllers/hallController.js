@@ -1,5 +1,6 @@
 const Hall = require('../models/Hall');
 const { Op } = require('sequelize');
+const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
 
 const EVENT_KEYWORDS = {
   wedding: ['wedding', 'marriage', 'engagement'],
@@ -63,6 +64,12 @@ exports.getAllHalls = async (req, res) => {
     }
 
     const where = filters.length ? { [Op.and]: filters } : undefined;
+
+    if (isPaginated(req.query)) {
+      const { page, limit, offset } = getPagination(req.query);
+      const result = await Hall.findAndCountAll({ where, order: [['id', 'DESC']], limit, offset });
+      return res.json(buildPageResponse({ rows: result.rows, count: result.count, page, limit }));
+    }
 
     const halls = await Hall.findAll({ where, order: [['id', 'DESC']] });
     res.json(halls);
