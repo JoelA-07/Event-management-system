@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+﻿const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
 const PaymentTransaction = sequelize.define('PaymentTransaction', {
@@ -9,6 +9,7 @@ const PaymentTransaction = sequelize.define('PaymentTransaction', {
   method: { type: DataTypes.ENUM('online', 'cash', 'manual'), allowNull: false },
   status: { type: DataTypes.ENUM('pending', 'paid', 'failed'), allowNull: false, defaultValue: 'pending' },
   razorpayPaymentId: { type: DataTypes.STRING, allowNull: true },
+  razorpayOrderId: { type: DataTypes.STRING, allowNull: true },
   razorpayPaymentLinkId: { type: DataTypes.STRING, allowNull: true },
   razorpayPaymentLinkReferenceId: { type: DataTypes.STRING, allowNull: true },
   paidAt: { type: DataTypes.DATE, allowNull: true },

@@ -1,2 +1,7 @@
 .env
 backend/.env
+client_secret_*.json
+*firebase-adminsdk*.json
+google-services.json
+mobile/android/app/google-services.json
+keys/*.json

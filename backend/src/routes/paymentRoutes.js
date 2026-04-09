@@ -1,9 +1,11 @@
-const express = require('express');
+﻿const express = require('express');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const {
   getPaymentSummary,
   setPaymentPlan,
   createPaymentLink,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
   markCashPayment,
   recordPayout,
   refundPayment,
@@ -16,6 +18,8 @@ const router = express.Router();
 router.get('/booking/:bookingType/:bookingId', verifyToken, getPaymentSummary);
 router.patch('/plan/:paymentId', verifyToken, requireRole('organizer'), setPaymentPlan);
 router.post('/link', verifyToken, createPaymentLink);
+router.post('/razorpay/order', verifyToken, createRazorpayOrder);
+router.post('/razorpay/verify', verifyToken, verifyRazorpayPayment);
 router.post('/mark-cash', verifyToken, requireRole('organizer'), markCashPayment);
 router.post('/payouts', verifyToken, requireRole('organizer'), recordPayout);
 router.post('/refund', verifyToken, requireRole('organizer'), refundPayment);
