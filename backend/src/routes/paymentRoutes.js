@@ -6,6 +6,7 @@ const {
   createPaymentLink,
   createRazorpayOrder,
   verifyRazorpayPayment,
+  refreshPaymentLinkStatus,
   markCashPayment,
   recordPayout,
   refundPayment,
@@ -18,6 +19,7 @@ const router = express.Router();
 router.get('/booking/:bookingType/:bookingId', verifyToken, getPaymentSummary);
 router.patch('/plan/:paymentId', verifyToken, requireRole('organizer'), setPaymentPlan);
 router.post('/link', verifyToken, createPaymentLink);
+router.post('/link/refresh/:paymentId', verifyToken, refreshPaymentLinkStatus);
 router.post('/razorpay/order', verifyToken, createRazorpayOrder);
 router.post('/razorpay/verify', verifyToken, verifyRazorpayPayment);
 router.post('/mark-cash', verifyToken, requireRole('organizer'), markCashPayment);

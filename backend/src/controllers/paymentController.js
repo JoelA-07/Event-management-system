@@ -10,7 +10,8 @@ const { getRazorpayClient, verifyWebhookSignature, verifyPaymentSignature } = re
 const { notifyUser, notifyOrganizers } = require('../services/notificationService');
 const { toNumber, computeStatus, recordRefund } = require('../services/paymentService');
 const { getPagination, isPaginated, buildPageResponse } = require('../utils/pagination');
-const { RAZORPAY_KEY_ID } = require('../config/env');
+const { RAZORPAY_KEY_ID, APP_BASE_URL } = require('../config/env');
+const { Op } = require('sequelize');
 const PDFDocument = require('pdfkit');
 
 async function ensureReceipt(payment) {
@@ -227,6 +228,10 @@ exports.createPaymentLink = async (req, res) => {
     const customer = await User.findByPk(payment.customerId, { attributes: ['name', 'email', 'phone'] });
 
     const razorpay = getRazorpayClient();
+    const origin = APP_BASE_URL || req.headers.origin || '';
+    const callbackUrl = origin
+      ? `${origin.replace(/\/$/, '')}/#/payments?bookingType=${bookingType}&bookingId=${bookingId}`
+      : undefined;
     const paymentLink = await razorpay.paymentLink.create({
       amount: Math.round(amountToCharge * 100),
       currency: payment.currency || 'INR',
@@ -238,7 +243,8 @@ exports.createPaymentLink = async (req, res) => {
         contact: customer?.phone || undefined,
       },
       notify: { sms: !!customer?.phone, email: !!customer?.email },
-      callback_url: undefined,
+      callback_url: callbackUrl,
+      callback_method: callbackUrl ? 'get' : undefined,
     });
 
     transaction.razorpayPaymentLinkId = paymentLink.id;
@@ -252,7 +258,61 @@ exports.createPaymentLink = async (req, res) => {
       amount: amountToCharge,
     });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to create payment link', error: error.message });
+    console.error('[payments] createPaymentLink failed:', error?.response?.data || error);
+    return res.status(500).json({
+      message: error?.message || 'Failed to create payment link',
+      error: error?.response?.data || error?.message || String(error),
+    });
+  }
+};
+
+exports.refreshPaymentLinkStatus = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    if (!paymentId) {
+      return res.status(400).json({ message: 'Missing paymentId' });
+    }
+
+    const payment = await Payment.findByPk(paymentId);
+    if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+    const transaction = await PaymentTransaction.findOne({
+      where: {
+        paymentId,
+        method: 'online',
+        status: 'pending',
+        razorpayPaymentLinkId: { [Op.ne]: null },
+      },
+      order: [['id', 'DESC']],
+    });
+
+    if (!transaction) {
+      return res.json({ message: 'No pending online transaction found', payment });
+    }
+
+    const razorpay = getRazorpayClient();
+    const paymentLink = await razorpay.paymentLink.fetch(transaction.razorpayPaymentLinkId);
+
+    const amountPaid = Number(paymentLink?.amount_paid || paymentLink?.amountPaid || 0);
+    const amount = Number(paymentLink?.amount || 0);
+    const isPaid = paymentLink?.status === 'paid' || (amount > 0 && amountPaid >= amount);
+
+    if (!isPaid) {
+      return res.json({ message: 'Payment still pending', status: paymentLink?.status || 'pending', payment });
+    }
+
+    const paymentIdFromLink = paymentLink?.payment_id || paymentLink?.payments?.[0]?.payment_id;
+    const result = await finalizeSuccessfulTransaction(transaction, {
+      razorpayPaymentId: paymentIdFromLink,
+    });
+
+    return res.json({ message: 'Payment updated', payment: result.payment, transaction: result.transaction });
+  } catch (error) {
+    console.error('[payments] refreshPaymentLinkStatus failed:', error?.response?.data || error);
+    return res.status(500).json({
+      message: error?.message || 'Failed to refresh payment link',
+      error: error?.response?.data || error?.message || String(error),
+    });
   }
 };
 
@@ -533,22 +593,66 @@ exports.downloadReceipt = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=receipt-${payment.id}.pdf`);
     doc.pipe(res);
 
-    doc.fontSize(18).text('Payment Receipt', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Receipt No: ${payment.receiptNumber || 'N/A'}`);
-    doc.text(`Receipt Date: ${payment.receiptIssuedAt ? new Date(payment.receiptIssuedAt).toLocaleString() : 'N/A'}`);
-    doc.moveDown();
+    const receiptDate = payment.receiptIssuedAt ? new Date(payment.receiptIssuedAt) : new Date();
+    const bookingDateRaw = payment.bookingType === 'hall'
+      ? (await Booking.findByPk(payment.bookingId))?.bookingDate
+      : (await VendorBooking.findByPk(payment.bookingId))?.bookingDate;
+    const bookingDate = bookingDateRaw ? new Date(bookingDateRaw).toLocaleDateString() : 'N/A';
+    const venueOrService = bookingLabel || 'Booking';
+
+    doc.fontSize(24).fillColor('#0F2A4A').text('Jireh Events', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(12).fillColor('#6B7280').text('Payment Receipt', { align: 'center' });
+    doc.moveDown(1.2);
+
+    doc
+      .fillColor('#111827')
+      .fontSize(14)
+      .text(`Hello ${customer?.name || 'there'},`, { align: 'left' });
+    doc
+      .fontSize(12)
+      .fillColor('#374151')
+      .text('Thank you for celebrating with us. Here is your booking receipt.', { align: 'left' });
+    doc.moveDown(1.2);
+
+    doc.fillColor('#111827').fontSize(12);
+    doc.text(`Receipt No: ${payment.receiptNumber || 'N/A'}`);
+    doc.text(`Receipt Date: ${receiptDate.toLocaleString()}`);
+    doc.moveDown(0.8);
 
     doc.text(`Customer: ${customer?.name || 'Customer'}`);
     doc.text(`Email: ${customer?.email || 'N/A'}`);
     doc.text(`Phone: ${customer?.phone || 'N/A'}`);
-    doc.moveDown();
+    doc.moveDown(0.8);
 
-    doc.text(bookingLabel);
+    doc
+      .moveTo(50, doc.y)
+      .lineTo(545, doc.y)
+      .strokeColor('#E5E7EB')
+      .lineWidth(1)
+      .stroke();
+    doc.moveDown(0.8);
+
+    doc.fontSize(13).fillColor('#0F2A4A').text('Booking Details');
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor('#111827');
+    doc.text(`${venueOrService}`);
+    doc.text(`Date: ${bookingDate}`);
+    doc.text(`Status: ${payment.status}`);
+    doc.moveDown(0.9);
+
+    doc.fontSize(13).fillColor('#0F2A4A').text('Payment Summary');
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor('#111827');
     doc.text(`Total Amount: Rs ${payment.totalAmount}`);
     doc.text(`Paid Amount: Rs ${payment.paidAmount}`);
     doc.text(`Refunded Amount: Rs ${payment.refundedAmount}`);
-    doc.text(`Status: ${payment.status}`);
+
+    doc.moveDown(1.4);
+    doc.fontSize(12).fillColor('#374151').text('With gratitude,', { align: 'left' });
+    doc.fontSize(12).fillColor('#0F2A4A').text('Jireh Events Team', { align: 'left' });
+    doc.moveDown(0.3);
+    doc.fontSize(10).fillColor('#6B7280').text('We are honored to be part of your celebration.', { align: 'left' });
 
     doc.end();
   } catch (error) {

@@ -48,6 +48,20 @@ class PaymentService {
     return null;
   }
 
+  Future<Map<String, dynamic>?> refreshPaymentLinkStatus({
+    required int paymentId,
+  }) async {
+    try {
+      final response = await _dio.post(
+        "${AppConstants.baseUrl}/payments/link/refresh/$paymentId",
+      );
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<String?> updatePlan({
     required int paymentId,
     required double advanceAmount,
@@ -117,6 +131,23 @@ class PaymentService {
     } catch (e) {
       if (e is DioException) return e.response?.data['message']?.toString();
     }
+    return null;
+  }
+
+  String buildReceiptUrl(int paymentId) {
+    return "${AppConstants.baseUrl}/payments/receipt/$paymentId";
+  }
+
+  Future<List<int>?> fetchReceiptBytes(int paymentId) async {
+    try {
+      final response = await _dio.get(
+        buildReceiptUrl(paymentId),
+        options: Options(responseType: ResponseType.bytes),
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        return List<int>.from(response.data as List);
+      }
+    } catch (_) {}
     return null;
   }
 }

@@ -3,9 +3,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile/core/theme.dart';
 import 'package:mobile/features/payments/services/payment_service.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'dart:typed_data';
+import 'package:url_launcher/url_launcher.dart';
 
 class PaymentSummaryScreen extends StatefulWidget {
   final String bookingType;
@@ -34,6 +34,7 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
   int _txPage = 1;
   int _txTotalPages = 1;
   bool _txLoadingMore = false;
+  bool _statusCheckDone = false;
 
   @override
   void initState() {
@@ -89,6 +90,21 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
       _loading = false;
       _txLoadingMore = false;
     });
+
+    if (!_statusCheckDone && payment != null) {
+      final status = payment['status']?.toString() ?? 'pending';
+      final hasPendingOnlineTx = _transactions.any((t) =>
+          t['method']?.toString() == 'online' &&
+          t['status']?.toString() == 'pending' &&
+          (t['razorpayPaymentLinkId']?.toString().isNotEmpty ?? false));
+      if (status != 'paid' && hasPendingOnlineTx) {
+        _statusCheckDone = true;
+        final refreshed = await _service.refreshPaymentLinkStatus(paymentId: payment['id']);
+        if (refreshed != null && mounted) {
+          await _load(reset: true);
+        }
+      }
+    }
   }
 
   Future<void> _loadMoreTx() async {
@@ -318,40 +334,15 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
   Future<void> _printReceipt() async {
     if (_summary == null) return;
     final payment = Map<String, dynamic>.from(_summary!['payment']);
-    final transactions = List<Map<String, dynamic>>.from(_transactions);
-
-    final doc = pw.Document();
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('Receipt', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 8),
-              pw.Text('Receipt No: ${payment['receiptNumber'] ?? '-'}'),
-              pw.Text('Booking: ${payment['bookingType']} #${payment['bookingId']}'),
-              pw.Text('Status: ${payment['status']}'),
-              pw.SizedBox(height: 10),
-              pw.Text('Total: Rs ${payment['totalAmount']}'),
-              pw.Text('Paid: Rs ${payment['paidAmount']}'),
-              pw.Text('Advance: Rs ${payment['advanceAmount']}'),
-              pw.SizedBox(height: 10),
-              pw.Text('Transactions', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 6),
-              pw.Column(
-                children: transactions.map((t) {
-                  return pw.Text('${t['type']} - Rs ${t['amount']} - ${t['method']} - ${t['status']}');
-                }).toList(),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.layoutPdf(onLayout: (_) => doc.save());
+    final bytes = await _service.fetchReceiptBytes(payment['id']);
+    if (bytes == null || bytes.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to load receipt')),
+      );
+      return;
+    }
+    await Printing.layoutPdf(onLayout: (_) async => Uint8List.fromList(bytes));
   }
 
   @override
@@ -443,6 +434,11 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
   Widget _customerActions(double advance, double remaining, double paid) {
     final advanceDue = advance > 0 && paid < advance;
     final balanceDue = remaining > 0 && !advanceDue;
+    final payment = _summary?['payment'];
+    final hasPendingOnlineTx = _transactions.any((t) =>
+        t['method']?.toString() == 'online' &&
+        t['status']?.toString() == 'pending' &&
+        (t['razorpayPaymentLinkId']?.toString().isNotEmpty ?? false));
     return Column(
       children: [
         if (advanceDue)
@@ -454,6 +450,16 @@ class _PaymentSummaryScreenState extends State<PaymentSummaryScreen> {
           ElevatedButton(
             onPressed: () => _pay('balance'),
             child: const Text('Pay Remaining Balance'),
+          ),
+        if (hasPendingOnlineTx)
+          TextButton(
+            onPressed: () async {
+              if (payment == null) return;
+              await _service.refreshPaymentLinkStatus(paymentId: payment['id']);
+              if (!mounted) return;
+              await _load(reset: true);
+            },
+            child: const Text('Check Payment Status'),
           ),
       ],
     );

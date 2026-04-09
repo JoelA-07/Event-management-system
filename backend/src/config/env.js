@@ -17,6 +17,8 @@ module.exports = {
   DB_USER: process.env.DB_USER,
   DB_PASSWORD: process.env.DB_PASSWORD,
   DB_HOST: process.env.DB_HOST,
+  DB_SYNC_ALTER: process.env.DB_SYNC_ALTER,
+  APP_BASE_URL: process.env.APP_BASE_URL,
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
   JWT_ISSUER: process.env.JWT_ISSUER || 'jireh-events',
