@@ -7,6 +7,7 @@ import 'package:mobile/features/halls/models/hall_model.dart';
 import 'package:mobile/features/bookings/providers/booking_provider.dart';
 import 'package:mobile/features/reviews/services/review_service.dart';
 import 'package:mobile/core/theme.dart';
+import 'package:mobile/core/constants.dart';
 
 class HallDetailScreen extends StatefulWidget {
   final HallModel hall;
@@ -145,7 +146,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.network(widget.hall.imageUrl, fit: BoxFit.cover),
+                    Image.network(AppConstants.resolveMediaUrl(widget.hall.imageUrl), fit: BoxFit.cover),
                     // Dark gradient overlay for text readability
                     const DecoratedBox(
                       decoration: BoxDecoration(

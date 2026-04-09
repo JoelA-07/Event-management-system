@@ -404,7 +404,10 @@ class _OrganizerAdminDashboardState extends State<OrganizerAdminDashboard> with 
                 child: OutlinedButton(
                   onPressed: onReject,
                   style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                  child: const Text('Reject'),
+                  child: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Reject', maxLines: 1, softWrap: false),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -413,7 +416,10 @@ class _OrganizerAdminDashboardState extends State<OrganizerAdminDashboard> with 
                 child: ElevatedButton(
                   onPressed: onApprove,
                   style: ElevatedButton.styleFrom(visualDensity: VisualDensity.compact),
-                  child: const Text('Approve'),
+                  child: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Approve', maxLines: 1, softWrap: false),
+                  ),
                 ),
               ),
             ],

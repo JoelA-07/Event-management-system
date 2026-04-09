@@ -37,5 +37,10 @@ class AppConstants {
 
   // UI Limits
   static const int maxPortfolioImages = 10;
+
+  static String resolveMediaUrl(String url) {
+    if (url.startsWith('http')) return url;
+    return "${baseUrl.replaceAll('/api', '')}$url";
+  }
 }
 
